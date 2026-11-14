@@ -1,0 +1,65 @@
+// MyMount - equatorial mount controller for the FYSETC E4.
+//
+// The USB serial port speaks LX200 only, so nothing else may print to Serial.
+#include <Arduino.h>
+#include <ESPmDNS.h>
+#include <WiFi.h>
+#include <time.h>
+#include "Astro.h"
+#include "Config.h"
+#include "LX200.h"
+#include "Mount.h"
+#include "Settings.h"
+#include "WebUI.h"
+
+static LX200 lx200(Serial);
+static bool ntpStarted = false;
+
+// Joins the configured network, or starts an access point if that is not possible.
+static void startWiFi() {
+  WiFi.persistent(false);
+  WiFi.setHostname(settings.hostname.c_str());
+  bool joined = false;
+  if (settings.ssid.length()) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(settings.ssid.c_str(), settings.password.c_str());
+    uint32_t start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) delay(100);
+    joined = WiFi.status() == WL_CONNECTED;
+  }
+  if (joined) {
+    WiFi.setAutoReconnect(true);
+    WiFi.setSleep(false);
+    configTime(0, 0, NTP_SERVER);
+    ntpStarted = true;
+  } else {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(settings.hostname.c_str(), AP_PASSWORD);
+  }
+  MDNS.begin(settings.hostname.c_str());
+  MDNS.addService("http", "tcp", 80);
+}
+
+// Takes the time from NTP once, unless a client has already set it.
+static void pollNtp() {
+  static uint32_t last = 0;
+  if (!ntpStarted || Astro::timeIsSet() || millis() - last < 1000) return;
+  last = millis();
+  time_t now = time(nullptr);
+  if (now > 1700000000) Astro::setUtc((double)now);
+}
+
+void setup() {
+  Serial.begin(LX200_BAUD);
+  settings.load();
+  mount.begin();
+  startWiFi();
+  WebUI::begin();
+}
+
+void loop() {
+  lx200.poll();
+  WebUI::poll();
+  pollNtp();
+  delay(1);
+}
