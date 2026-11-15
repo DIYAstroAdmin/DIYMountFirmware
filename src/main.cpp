@@ -8,6 +8,7 @@
 #include "Astro.h"
 #include "Config.h"
 #include "LX200.h"
+#include "Log.h"
 #include "Mount.h"
 #include "Settings.h"
 #include "WebUI.h"
@@ -32,9 +33,12 @@ static void startWiFi() {
     WiFi.setSleep(false);
     configTime(0, 0, NTP_SERVER);
     ntpStarted = true;
+    LOGI("WiFi: joined '%s', address %s", settings.ssid.c_str(), WiFi.localIP().toString().c_str());
   } else {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(settings.hostname.c_str(), AP_PASSWORD);
+    if (settings.ssid.length()) LOGW("WiFi: could not join '%s'", settings.ssid.c_str());
+    LOGI("WiFi: access point '%s', address %s", settings.hostname.c_str(), WiFi.softAPIP().toString().c_str());
   }
   MDNS.begin(settings.hostname.c_str());
   MDNS.addService("http", "tcp", 80);
@@ -46,11 +50,15 @@ static void pollNtp() {
   if (!ntpStarted || Astro::timeIsSet() || millis() - last < 1000) return;
   last = millis();
   time_t now = time(nullptr);
-  if (now > 1700000000) Astro::setUtc((double)now);
+  if (now > 1700000000) {
+    Astro::setUtc((double)now);
+    LOGI("Time set from NTP");
+  }
 }
 
 void setup() {
   Serial.begin(LX200_BAUD);
+  LOGI(FIRMWARE_NAME " " FIRMWARE_VERSION " starting");
   settings.load();
   mount.begin();
   startWiFi();

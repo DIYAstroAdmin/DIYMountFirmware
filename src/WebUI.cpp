@@ -3,6 +3,7 @@
 #include "Alpaca.h"
 #include "Astro.h"
 #include "Config.h"
+#include "Log.h"
 #include "Mount.h"
 #include "Settings.h"
 #include "WebPage.h"
@@ -138,6 +139,29 @@ static String jsonEscape(const String &s) {
   return out;
 }
 
+// Log lines newer than 'since'. 'now' lets the page turn each line's millis() into a clock time.
+static void handleLog() {
+  uint32_t newest = Log::newest();
+  uint32_t since = strtoul(server.arg("since").c_str(), nullptr, 10);
+  if (since > newest) since = 0;   // the page is ahead of us: the controller has restarted
+  uint32_t first = newest > Log::CAPACITY ? newest - Log::CAPACITY + 1 : 1;
+  if (since >= first) first = since + 1;
+
+  String j;
+  j.reserve(256 + (newest + 1 - first) * 64);
+  j += "{\"now\":" + String(millis()) + ",\"lines\":[";
+  Log::Entry e;
+  bool any = false;
+  for (uint32_t seq = first; seq <= newest; seq++) {
+    if (!Log::read(seq, e)) continue;   // overwritten while this reply was being built
+    if (any) j += ',';
+    any = true;
+    j += "{\"t\":" + String(e.ms) + ",\"l\":" + String((int)e.level) + ",\"m\":\"" + jsonEscape(e.text) + "\"}";
+  }
+  j += "],\"next\":" + String(newest) + "}";
+  sendJson(j);
+}
+
 static void handleConfigGet() {
   String j = "{";
   j += "\"ssid\":\"" + jsonEscape(settings.ssid) + "\"";
@@ -177,6 +201,7 @@ static void handleConfigPost() {
   if (server.hasArg("slewRate")) settings.slewRate = server.arg("slewRate").toDouble();
   if (server.hasArg("meridianLimit")) settings.meridianLimit = server.arg("meridianLimit").toDouble();
   settings.save();
+  LOGI("Configuration saved%s", wifiChanged ? " (network settings changed, restart to apply)" : "");
   sendJson(String("{\"ok\":true,\"reboot\":") + boolText(wifiChanged) + "}");
 }
 
@@ -184,6 +209,7 @@ void begin() {
   server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", WEB_PAGE); });
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/cmd", HTTP_POST, handleCommand);
+  server.on("/api/log", HTTP_GET, handleLog);
   server.on("/api/config", HTTP_GET, handleConfigGet);
   server.on("/api/config", HTTP_POST, handleConfigPost);
   server.onNotFound([]() {

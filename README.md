@@ -104,3 +104,4 @@ Slews are asynchronous only (`SlewToCoordinatesAsync`, `SlewToTargetAsync`).
 | `src/Alpaca.*` | ASCOM Alpaca API and discovery |
 | `src/WebUI.*`, `src/WebPage.h` | Web server, JSON API and the page |
 | `src/Settings.*` | Settings stored in flash |
+| `src/Log.*` | Log buffer shown on the web page (`LOGD`/`LOGI`/`LOGW`/`LOGE`) |

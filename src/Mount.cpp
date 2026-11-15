@@ -1,6 +1,7 @@
 #include "Mount.h"
 #include "Astro.h"
 #include "Config.h"
+#include "Log.h"
 #include "Settings.h"
 
 Mount mount;
@@ -48,8 +49,12 @@ void Mount::begin() {
                   RA_RUN_CURRENT_MA, RA_MICROSTEPS});
   _dec = new Axis({PIN_DEC_STEP, PIN_DEC_DIR, DEC_INVERT_DIR, DEC_STEPS_PER_DEG, DEC_TMC_ADDRESS,
                    DEC_RUN_CURRENT_MA, DEC_MICROSTEPS});
-  _ra->begin(_engine, Serial1);
-  _dec->begin(_engine, Serial1);
+  if (!_ra->begin(_engine, Serial1)) LOGE("RA axis: step generator could not be started");
+  if (!_dec->begin(_engine, Serial1)) LOGE("Dec axis: step generator could not be started");
+  if (_ra->driverOk()) LOGI("RA driver ok");
+  else LOGE("RA driver not responding");
+  if (_dec->driverOk()) LOGI("Dec driver ok");
+  else LOGE("Dec driver not responding");
 
   _home[0] = {_ra, PIN_RA_HOME, RA_HOME_SEARCH_DIR, RA_HOME_SWITCH_ANGLE, RA_HOME_MAX_TRAVEL,
               HP_DONE, 0, false, 0};
@@ -58,7 +63,8 @@ void Mount::begin() {
 
   digitalWrite(PIN_MOTOR_ENABLE, LOW);    // motors on, holding position
 
-  xTaskCreatePinnedToCore(taskEntry, "mount", 4096, this, 3, nullptr, 1);
+  // Stack leaves room for formatting log messages (printf with doubles) from the task.
+  xTaskCreatePinnedToCore(taskEntry, "mount", 6144, this, 3, nullptr, 1);
 }
 
 void Mount::taskEntry(void *arg) {
@@ -279,6 +285,8 @@ MountError Mount::gotoEqu(double raHours, double decDeg) {
   _gotoRa = raHours;
   _gotoDec = decDeg;
   _gotoSide = side;
+  LOGI("Goto RA %.4f h, Dec %.3f deg (pier %s, axes %.2f, %.2f)", raHours, decDeg,
+       side == PIER_EAST ? "East" : "West", a1, a2);
   startSlew(a1, a2, SLEW_GOTO);
   return M_OK;
 }
@@ -304,6 +312,7 @@ MountError Mount::syncEqu(double raHours, double decDeg) {
   if (!done && !solve(ha, decDeg, a1, a2, side)) return M_LIMITS;
   _ra->setAngle(a1);
   _dec->setAngle(a2);
+  LOGI("Sync to RA %.4f h, Dec %.3f deg (axes %.2f, %.2f)", raHours, decDeg, a1, a2);
   return M_OK;
 }
 
@@ -394,6 +403,7 @@ void Mount::abort() {
     _dec->stop();
     _state = MountState::Idle;
     _message = "Stopped";
+    LOGW("Motion aborted");
   }
 }
 
@@ -414,6 +424,7 @@ MountError Mount::findHome() {
   }
   _state = MountState::Homing;
   _message = "";
+  LOGI("Home search started");
   return M_OK;
 }
 
@@ -422,12 +433,14 @@ MountError Mount::park() {
   if (_atPark) return M_OK;
   if (_state == MountState::Homing) return M_BUSY;
   _tracking = false;
+  LOGI("Parking");
   startSlew(0, 0, SLEW_PARK);
   return M_OK;
 }
 
 void Mount::unpark() {
   MountLock lock(*this);
+  if (_atPark) LOGI("Unparked");
   _atPark = false;
 }
 
@@ -439,6 +452,7 @@ MountError Mount::setHomeHere() {
   _ra->setAngle(0);
   _dec->setAngle(0);
   _message = "";
+  LOGI("Current position set as home");
   return M_OK;
 }
 
@@ -486,7 +500,10 @@ void Mount::tickIdle() {
   double limit1 = 90.0 + settings.meridianLimit;
   double a1 = _ra->angle();
   if ((a1 >= limit1 && v1 > 0) || (a1 <= -limit1 && v1 < 0)) {
-    if (_tracking) _message = "Tracking stopped at the meridian limit";
+    if (_tracking) {
+      _message = "Tracking stopped at the meridian limit";
+      LOGW("Tracking stopped at the meridian limit (axis 1 at %.2f deg)", a1);
+    }
     _tracking = false;
     _manual[0] = 0;
     _manualEnd[0] = 0;
@@ -528,13 +545,16 @@ void Mount::tickSlew() {
   switch (_slewKind) {
     case SLEW_GOTO:
       _tracking = true;
+      LOGI("Goto complete, tracking");
       break;
     case SLEW_PARK:
       _tracking = false;
       _atPark = true;
+      LOGI("Parked");
       break;
     case SLEW_HOME:
       _tracking = false;
+      LOGI("At home");
       break;
   }
 }
@@ -575,12 +595,14 @@ void Mount::tickHoming() {
         _dec->stop();
         _state = MountState::Idle;
         _message = i == 0 ? "Homing failed: RA switch not found" : "Homing failed: Dec switch not found";
+        LOGE("%s", _message);
         return;
       }
     }
   }
   if (allDone && !_ra->isRunning() && !_dec->isRunning()) {
     _homed = true;
+    LOGI("Home switches found, moving to home");
     startSlew(0, 0, SLEW_HOME);
   }
 }

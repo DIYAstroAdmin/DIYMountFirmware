@@ -34,6 +34,14 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
   .tag { font-size:.8rem; padding:2px 8px; border:1px solid var(--line); border-radius:10px; }
   .bad { color:var(--hot); border-color:var(--hot); }
+  .wide { grid-column:1 / -1; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; }
+  .head button { padding:2px 10px; font-size:.8rem; }
+  #log { height:220px; overflow-y:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+         font-family:ui-monospace,Consolas,monospace; font-size:.8rem; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
+  #log .debug { color:var(--dim); }
+  #log .warn { color:var(--hot); }
+  #log .error { color:var(--hot); font-weight:600; }
 </style>
 </head>
 <body>
@@ -120,6 +128,11 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <button id="reboot">Restart</button>
     </div>
   </section>
+
+  <section class="wide">
+    <div class="head"><h2>Log</h2><button id="clearlog">Clear</button></div>
+    <div id="log"></div>
+  </section>
 </main>
 
 <script>
@@ -182,6 +195,32 @@ async function refresh() {
   }
 }
 
+// Log: fetch the lines added since the last poll and append them. The view follows
+// the newest line unless it has been scrolled up.
+const LOG_CLASSES = ['debug', 'info', 'warn', 'error'], LOG_KEEP = 500;
+let logSeq = 0, logNow = 0;
+
+async function refreshLog() {
+  try {
+    const j = await (await fetch('/api/log?since=' + logSeq)).json();
+    const restarted = j.now < logNow;
+    logNow = j.now;
+    if (restarted) { logSeq = 0; return; }   // uptime went backwards: fetch everything next time
+    logSeq = j.next;
+    if (!j.lines.length) return;
+    const box = $('log');
+    const follow = box.scrollHeight - box.scrollTop - box.clientHeight < 8;
+    for (const e of j.lines) {
+      const d = document.createElement('div');
+      d.className = LOG_CLASSES[e.l] || 'info';
+      d.textContent = new Date(Date.now() - (j.now - e.t)).toTimeString().slice(0, 8) + '  ' + e.m;
+      box.appendChild(d);
+    }
+    while (box.childElementCount > LOG_KEEP) box.firstChild.remove();
+    if (follow) box.scrollTop = box.scrollHeight;
+  } catch (e) {}
+}
+
 async function loadConfig() {
   try {
     const c = await (await fetch('/api/config')).json();
@@ -230,9 +269,13 @@ $('save').onclick = async () => {
   } catch (e) { say('Save failed'); }
 };
 
+$('clearlog').onclick = () => $('log').replaceChildren();
+
 loadConfig();
 refresh();
+refreshLog();
 setInterval(refresh, 1000);
+setInterval(refreshLog, 1000);
 </script>
 </body>
 </html>
