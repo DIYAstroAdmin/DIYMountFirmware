@@ -30,6 +30,8 @@ class Axis {
   bool isRunning() const;
   bool driverOk() const { return _driverOk; }
   double stepsPerDeg() const { return _p.stepsPerDeg; }
+  double maxRate() const;                   // deg/s, MAX_SLEW_RATE or less if the step rate limits it
+  void setCurrent(uint16_t ma);             // RMS run current, takes effect immediately
 
  private:
   void applySpeed(double stepsPerSec);

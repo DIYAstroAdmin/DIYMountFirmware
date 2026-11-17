@@ -177,7 +177,7 @@ static bool handleGet(const String &m) {
     double axis;
     if (!numArg("Axis", axis)) return true;
     if (axis < 0 || axis > 2) sendError(E_INVALID_VALUE, "Invalid axis");
-    else if (axis < 2) sendResponse("[{\"Maximum\":" + String((double)MAX_SLEW_RATE, 4) + ",\"Minimum\":0.0}]");
+    else if (axis < 2) sendResponse("[{\"Maximum\":" + String(mount.maxRate((int)axis), 4) + ",\"Minimum\":0.0}]");
     else sendResponse("[]");
   } else if (m == "trackingrates") sendResponse("[0,1,2]");
 

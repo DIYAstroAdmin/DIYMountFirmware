@@ -13,6 +13,7 @@
 #pragma once
 #include <Arduino.h>
 #include "Axis.h"
+#include "Settings.h"
 
 enum class MountState { Idle, Slewing, Homing };
 
@@ -89,6 +90,12 @@ class Mount {
   void unpark();
   MountError setHomeHere();     // declare the current position to be the home position
 
+  // Axis configuration. Microsteps, gear ratio and direction in 'settings' take effect at
+  // the next restart; restartNeeded() says whether the saved values differ from the running ones.
+  double maxRate(int axis);     // deg/s
+  bool restartNeeded();
+  void applyCurrents();         // apply the motor currents from 'settings' now
+
   static const char *errorText(MountError e);
 
  private:
@@ -128,6 +135,7 @@ class Mount {
   Axis *_ra = nullptr;
   Axis *_dec = nullptr;
   HomeAxis _home[2];
+  AxisSettings _active[2];           // axis settings the motors were started with
 
   MountState _state = MountState::Idle;
   SlewKind _slewKind = SLEW_GOTO;

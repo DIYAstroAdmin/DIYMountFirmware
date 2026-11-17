@@ -42,6 +42,14 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   #log .debug { color:var(--dim); }
   #log .warn { color:var(--hot); }
   #log .error { color:var(--hot); font-weight:600; }
+  table.axes { width:100%; border-collapse:collapse; }
+  table.axes th { text-align:left; font-weight:normal; color:var(--dim); font-size:.8rem; padding:4px 6px 4px 0; }
+  table.axes td { padding:3px 0 3px 6px; }
+  table.axes td select { width:100%; }
+  table.axes input[type=checkbox] { width:auto; transform:scale(1.3); }
+  table.axes tr.group th { padding-top:12px; text-transform:uppercase; letter-spacing:.08em; font-size:.7rem; }
+  .note { font-size:.8rem; color:var(--dim); margin-top:8px; }
+  .note.pending { color:var(--hot); }
 </style>
 </head>
 <body>
@@ -126,6 +134,31 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
     <div class="row">
       <button id="save">Save</button>
       <button id="reboot">Restart</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Axes</h2>
+    <table class="axes">
+      <thead><tr><th></th><th>RA</th><th>Dec</th></tr></thead>
+      <tbody>
+        <tr><th>Motor step angle</th><td><input id="ra_stepAngle" disabled></td><td><input id="dec_stepAngle" disabled></td></tr>
+        <tr><th>Microsteps *</th><td><select id="ra_microsteps"></select></td><td><select id="dec_microsteps"></select></td></tr>
+        <tr><th>Gear ratio (:1) *</th><td><input id="ra_gearRatio" type="number" step="any"></td><td><input id="dec_gearRatio" type="number" step="any"></td></tr>
+        <tr><th>Reverse direction *</th><td><input id="ra_invert" type="checkbox"></td><td><input id="dec_invert" type="checkbox"></td></tr>
+        <tr><th>Current (mA RMS)</th><td><input id="ra_current" type="number" step="10"></td><td><input id="dec_current" type="number" step="10"></td></tr>
+        <tr><th>Max speed (deg/s)</th><td><input id="ra_maxRate" disabled></td><td><input id="dec_maxRate" disabled></td></tr>
+        <tr class="group"><th colspan="3">Homing</th></tr>
+        <tr><th>Search direction</th>
+          <td><select id="ra_homeDir"><option value="1">Positive</option><option value="-1">Negative</option></select></td>
+          <td><select id="dec_homeDir"><option value="1">Positive</option><option value="-1">Negative</option></select></td></tr>
+        <tr><th>Switch angle (deg)</th><td><input id="ra_homeAngle" type="number" step="any"></td><td><input id="dec_homeAngle" type="number" step="any"></td></tr>
+      </tbody>
+    </table>
+    <div id="axesnote" class="note">* Applied when the controller restarts. Current and homing apply immediately.</div>
+    <div class="row">
+      <button id="saveaxes">Save</button>
+      <button id="reboot2">Restart</button>
     </div>
   </section>
 
@@ -221,13 +254,44 @@ async function refreshLog() {
   } catch (e) {}
 }
 
+const AXES = ['ra', 'dec'];
+const AXIS_FIELDS = ['microsteps', 'gearRatio', 'current', 'homeDir', 'homeAngle'];
+for (const a of AXES) {
+  for (let m = 1; m <= 256; m *= 2) $(a + '_microsteps').add(new Option(m, m));
+}
+
 async function loadConfig() {
   try {
     const c = await (await fetch('/api/config')).json();
     CONFIG_FIELDS.forEach(f => $(f).value = c[f]);
     $('slewRate').max = c.maxSlewRate;
     $('ip').value = c.ip + (c.ap ? ' (access point)' : '');
+    AXES.forEach((a, i) => {
+      const x = c.axes[i];
+      AXIS_FIELDS.forEach(f => $(a + '_' + f).value = x[f]);
+      $(a + '_invert').checked = x.invert;
+      $(a + '_stepAngle').value = x.stepAngle + '°';
+      $(a + '_maxRate').value = x.maxRate;
+      $(a + '_current').min = c.currentRange[0];
+      $(a + '_current').max = c.currentRange[1];
+      $(a + '_gearRatio').min = c.gearRange[0];
+      $(a + '_gearRatio').max = c.gearRange[1];
+    });
+    const note = $('axesnote');
+    note.classList.toggle('pending', c.restartNeeded);
+    note.textContent = c.restartNeeded
+      ? 'Saved axis changes are waiting for a restart. The mount position will be reset to home.'
+      : '* Applied when the controller restarts. Current and homing apply immediately.';
   } catch (e) { say('Could not load configuration'); }
+}
+
+async function saveConfig(body) {
+  try {
+    const j = await (await fetch('/api/config', { method:'POST', body })).json();
+    say(j.reboot ? 'Saved. Restart to apply all the changes.' : 'Saved');
+    loadConfig();
+    return true;
+  } catch (e) { say('Save failed'); return false; }
 }
 
 // Direction buttons: move while held. The move is refreshed while the button is down
@@ -256,17 +320,22 @@ $('sethome').onclick = () => confirm('Declare the current position to be home (c
 $('goto').onclick = () => { const t = target(); if (t) cmd('goto', t); };
 $('sync').onclick = () => { const t = target(); if (t) cmd('sync', t).then(ok => ok && say('Synced')); };
 $('settime').onclick = () => cmd('time', { utc: Date.now() / 1000 }).then(ok => ok && say('Time set'));
-$('reboot').onclick = () => confirm('Restart the controller? The mount position will be reset to home.') && cmd('reboot');
+const restart = () => confirm('Restart the controller? The mount position will be reset to home.') && cmd('reboot');
+$('reboot').onclick = restart;
+$('reboot2').onclick = restart;
 $('save').onclick = async () => {
   const body = new URLSearchParams();
   CONFIG_FIELDS.forEach(f => body.set(f, $(f).value));
   if ($('password').value) body.set('password', $('password').value);
-  try {
-    const j = await (await fetch('/api/config', { method:'POST', body })).json();
-    say(j.reboot ? 'Saved. Restart to apply the network changes.' : 'Saved');
-    $('password').value = '';
-    loadConfig();
-  } catch (e) { say('Save failed'); }
+  if (await saveConfig(body)) $('password').value = '';
+};
+$('saveaxes').onclick = () => {
+  const body = new URLSearchParams();
+  for (const a of AXES) {
+    AXIS_FIELDS.forEach(f => body.set(a + '_' + f, $(a + '_' + f).value));
+    body.set(a + '_invert', $(a + '_invert').checked ? 1 : 0);
+  }
+  saveConfig(body);
 };
 
 $('clearlog').onclick = () => $('log').replaceChildren();

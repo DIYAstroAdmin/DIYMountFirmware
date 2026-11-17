@@ -24,6 +24,16 @@ bool Axis::begin(FastAccelStepperEngine &engine, Stream &tmcSerial) {
   return true;
 }
 
+double Axis::maxRate() const {
+  return min((double)MAX_SLEW_RATE, MAX_STEP_RATE / _p.stepsPerDeg);
+}
+
+void Axis::setCurrent(uint16_t ma) {
+  if (!_driver || ma == _p.runCurrentMa) return;
+  _p.runCurrentMa = ma;
+  _driver->rms_current(ma, HOLD_CURRENT_FRACTION);
+}
+
 double Axis::angle() const {
   if (!_stepper) return 0;
   return ((double)_stepper->getCurrentPosition() - _zeroSteps) / _p.stepsPerDeg;
@@ -45,7 +55,7 @@ void Axis::applySpeed(double sps) {
 
 void Axis::setVelocity(double degPerSec) {
   if (!_stepper) return;
-  degPerSec = constrain(degPerSec, -(double)MAX_SLEW_RATE, (double)MAX_SLEW_RATE);
+  degPerSec = constrain(degPerSec, -maxRate(), maxRate());
   if (degPerSec == _lastVelocity) return;
   _lastVelocity = degPerSec;
 
@@ -66,7 +76,7 @@ void Axis::setVelocity(double degPerSec) {
 void Axis::moveTo(double deg, double maxDegPerSec) {
   if (!_stepper) return;
   _lastVelocity = NAN;
-  maxDegPerSec = constrain(maxDegPerSec, 0.01, (double)MAX_SLEW_RATE);
+  maxDegPerSec = constrain(maxDegPerSec, 0.01, maxRate());
   applySpeed(maxDegPerSec * _p.stepsPerDeg);
   _stepper->moveTo((int32_t)lround(deg * _p.stepsPerDeg + _zeroSteps));
 }

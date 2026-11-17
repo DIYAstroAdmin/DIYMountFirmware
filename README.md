@@ -23,14 +23,28 @@ The Z and E0 drivers are not used.
 
 ## Configuration
 
-Everything about the hardware is set in [include/Config.h](include/Config.h) before building:
+Hardware settings are in [include/Config.h](include/Config.h). Those marked `[web]` there are
+only defaults: they can be changed on the web page, are kept in flash, and then take
+precedence over the file.
 
-- `RA_MOTOR_STEP_ANGLE`, `RA_MICROSTEPS`, `RA_GEAR_RATIO` (and the `DEC_` equivalents).
-  The gear ratio is the total reduction: motor revolutions per revolution of the axis.
-- `RA_INVERT_DIR` / `DEC_INVERT_DIR`, motor currents, slew speed limit and acceleration.
-- Home switch polarity, search direction and the axis angle at which each switch triggers.
-- Default site, WiFi and rate settings. These can be changed later from the web page
-  and are then kept in flash.
+Set on the web page (**Axes** panel), per axis:
+
+| Setting | When it takes effect |
+|---------|----------------------|
+| Microsteps, gear ratio, reverse direction | At the next restart |
+| Motor current | Immediately |
+| Home search direction, home switch angle | At the next *Find home* |
+
+The gear ratio is the total reduction: motor revolutions per revolution of the axis.
+Restarting resets the mount position to home, so park the mount before restarting.
+If the microsteps and gear ratio would need more than 200,000 steps/s at the slew rate,
+that axis is slowed down; the panel shows each axis' maximum speed.
+
+Set in `Config.h` only: motor step angle, slew speed limit and acceleration, home switch
+polarity and maximum search travel, pins and driver addresses.
+
+Site, WiFi and rate defaults are also in `Config.h` and can be changed on the
+**Configuration** panel.
 
 Build and upload with PlatformIO:
 
@@ -49,9 +63,9 @@ before switching on, use *Find home* (switches), or move it there and press *Set
 Do this once, from the web page, with the mount at home:
 
 1. Turn tracking on. The RA axis must turn the way the sky moves (towards the west).
-   If it turns the other way, flip `RA_INVERT_DIR`.
+   If it turns the other way, tick *Reverse direction* for RA on the Axes panel, save and restart.
 2. Go back to home and *Set home here*. Hold **S** at the find rate. The telescope must tip
-   over towards the **western** horizon. If it tips east, flip `DEC_INVERT_DIR`.
+   over towards the **western** horizon. If it tips east, reverse Dec the same way.
 
 ## Connecting
 

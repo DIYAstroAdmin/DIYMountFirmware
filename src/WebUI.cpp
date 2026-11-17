@@ -171,8 +171,24 @@ static void handleConfigGet() {
   j += ",\"elevation\":" + String(settings.elevation, 1);
   j += ",\"guideRate\":" + String(settings.guideRate, 2);
   j += ",\"slewRate\":" + String(settings.slewRate, 2);
-  j += ",\"maxSlewRate\":" + String((double)MAX_SLEW_RATE, 2);
+  j += ",\"maxSlewRate\":" + String(min(mount.maxRate(0), mount.maxRate(1)), 2);
   j += ",\"meridianLimit\":" + String(settings.meridianLimit, 1);
+  j += ",\"axes\":[";
+  for (int i = 0; i < 2; i++) {
+    const AxisSettings &a = settings.axis[i];
+    if (i) j += ",";
+    j += "{\"stepAngle\":" + String(i == 0 ? RA_MOTOR_STEP_ANGLE : DEC_MOTOR_STEP_ANGLE, 2);
+    j += ",\"microsteps\":" + String(a.microsteps);
+    j += ",\"gearRatio\":" + String(a.gearRatio, 4);
+    j += ",\"invert\":" + String(boolText(a.invert));
+    j += ",\"current\":" + String(a.currentMa);
+    j += ",\"homeDir\":" + String(a.homeDir);
+    j += ",\"homeAngle\":" + String(a.homeAngle, 3);
+    j += ",\"maxRate\":" + String(mount.maxRate(i), 2) + "}";
+  }
+  j += "],\"restartNeeded\":" + String(boolText(mount.restartNeeded()));
+  j += ",\"currentRange\":[" + String(MIN_RUN_CURRENT_MA) + "," + String(MAX_RUN_CURRENT_MA) + "]";
+  j += ",\"gearRange\":[" + String(MIN_GEAR_RATIO, 0) + "," + String(MAX_GEAR_RATIO, 0) + "]";
   j += ",\"ip\":\"" + (WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP()).toString() + "\"";
   j += ",\"ap\":" + String(boolText(WiFi.getMode() == WIFI_AP));
   j += ",\"version\":\"" FIRMWARE_VERSION "\"";
@@ -200,9 +216,26 @@ static void handleConfigPost() {
   if (server.hasArg("guideRate")) settings.guideRate = server.arg("guideRate").toDouble();
   if (server.hasArg("slewRate")) settings.slewRate = server.arg("slewRate").toDouble();
   if (server.hasArg("meridianLimit")) settings.meridianLimit = server.arg("meridianLimit").toDouble();
-  settings.save();
-  LOGI("Configuration saved%s", wifiChanged ? " (network settings changed, restart to apply)" : "");
-  sendJson(String("{\"ok\":true,\"reboot\":") + boolText(wifiChanged) + "}");
+
+  // Axis fields are named ra_<field> and dec_<field>.
+  static const char *prefix[2] = {"ra_", "dec_"};
+  for (int i = 0; i < 2; i++) {
+    AxisSettings &a = settings.axis[i];
+    String p = prefix[i];
+    if (server.hasArg(p + "microsteps")) a.microsteps = (uint16_t)server.arg(p + "microsteps").toInt();
+    if (server.hasArg(p + "gearRatio")) a.gearRatio = server.arg(p + "gearRatio").toDouble();
+    if (server.hasArg(p + "invert")) a.invert = server.arg(p + "invert") == "1";
+    if (server.hasArg(p + "current")) a.currentMa = (uint16_t)constrain(server.arg(p + "current").toInt(), 0, 65535);
+    if (server.hasArg(p + "homeDir")) a.homeDir = server.arg(p + "homeDir").toInt() < 0 ? -1 : 1;
+    if (server.hasArg(p + "homeAngle")) a.homeAngle = server.arg(p + "homeAngle").toDouble();
+  }
+  settings.save();         // also brings out-of-range values back into range
+  mount.applyCurrents();
+
+  bool axesChanged = mount.restartNeeded();
+  LOGI("Configuration saved%s%s", wifiChanged ? " (network settings changed, restart to apply)" : "",
+       axesChanged ? " (axis settings changed, restart to apply)" : "");
+  sendJson(String("{\"ok\":true,\"reboot\":") + boolText(wifiChanged || axesChanged) + "}");
 }
 
 void begin() {

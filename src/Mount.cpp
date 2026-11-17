@@ -45,10 +45,13 @@ void Mount::begin() {
   Serial1.begin(TMC_BAUD, SERIAL_8N1, PIN_TMC_RX, PIN_TMC_TX);
   _engine.init();
 
-  _ra = new Axis({PIN_RA_STEP, PIN_RA_DIR, RA_INVERT_DIR, RA_STEPS_PER_DEG, RA_TMC_ADDRESS,
-                  RA_RUN_CURRENT_MA, RA_MICROSTEPS});
-  _dec = new Axis({PIN_DEC_STEP, PIN_DEC_DIR, DEC_INVERT_DIR, DEC_STEPS_PER_DEG, DEC_TMC_ADDRESS,
-                   DEC_RUN_CURRENT_MA, DEC_MICROSTEPS});
+  // Microsteps, gear ratio and direction are fixed from here until the next restart.
+  for (int i = 0; i < 2; i++) _active[i] = settings.axis[i];
+  const AxisSettings &ra = _active[0], &dec = _active[1];
+  _ra = new Axis({PIN_RA_STEP, PIN_RA_DIR, ra.invert, Settings::stepsPerDeg(0, ra), RA_TMC_ADDRESS,
+                  ra.currentMa, ra.microsteps});
+  _dec = new Axis({PIN_DEC_STEP, PIN_DEC_DIR, dec.invert, Settings::stepsPerDeg(1, dec), DEC_TMC_ADDRESS,
+                   dec.currentMa, dec.microsteps});
   if (!_ra->begin(_engine, Serial1)) LOGE("RA axis: step generator could not be started");
   if (!_dec->begin(_engine, Serial1)) LOGE("Dec axis: step generator could not be started");
   if (_ra->driverOk()) LOGI("RA driver ok");
@@ -56,10 +59,18 @@ void Mount::begin() {
   if (_dec->driverOk()) LOGI("Dec driver ok");
   else LOGE("Dec driver not responding");
 
-  _home[0] = {_ra, PIN_RA_HOME, RA_HOME_SEARCH_DIR, RA_HOME_SWITCH_ANGLE, RA_HOME_MAX_TRAVEL,
-              HP_DONE, 0, false, 0};
-  _home[1] = {_dec, PIN_DEC_HOME, DEC_HOME_SEARCH_DIR, DEC_HOME_SWITCH_ANGLE, DEC_HOME_MAX_TRAVEL,
-              HP_DONE, 0, false, 0};
+  Axis *axes[2] = {_ra, _dec};
+  const char *names[2] = {"RA", "Dec"};
+  for (int i = 0; i < 2; i++) {
+    LOGI("%s axis: %u microsteps, gear %.2f:1, %.1f steps/deg, %u mA%s", names[i], _active[i].microsteps,
+         _active[i].gearRatio, axes[i]->stepsPerDeg(), _active[i].currentMa, _active[i].invert ? ", inverted" : "");
+    if (axes[i]->maxRate() < MAX_SLEW_RATE)
+      LOGW("%s axis: speed limited to %.2f deg/s by the step rate (fewer microsteps would allow more)",
+           names[i], axes[i]->maxRate());
+  }
+
+  _home[0] = {_ra, PIN_RA_HOME, 1, 0, RA_HOME_MAX_TRAVEL, HP_DONE, 0, false, 0};
+  _home[1] = {_dec, PIN_DEC_HOME, 1, 0, DEC_HOME_MAX_TRAVEL, HP_DONE, 0, false, 0};
 
   digitalWrite(PIN_MOTOR_ENABLE, LOW);    // motors on, holding position
 
@@ -329,7 +340,7 @@ int Mount::destinationSideOfPier(double raHours, double decDeg) {
 // ---------------------------------------------------------------------------
 MountError Mount::moveAxis(int axis, double degPerSec, uint32_t timeoutMs) {
   if (axis < 0 || axis > 1) return M_RANGE;
-  if (fabs(degPerSec) > MAX_SLEW_RATE) return M_RANGE;
+  if (fabs(degPerSec) > (axis == 0 ? _ra : _dec)->maxRate()) return M_RANGE;
   MountLock lock(*this);
   if (_atPark) return M_PARKED;
   if (_state != MountState::Idle) return M_BUSY;
@@ -408,6 +419,27 @@ void Mount::abort() {
 }
 
 // ---------------------------------------------------------------------------
+// Axis configuration
+// ---------------------------------------------------------------------------
+double Mount::maxRate(int axis) {
+  return (axis == 0 ? _ra : _dec)->maxRate();
+}
+
+bool Mount::restartNeeded() {
+  for (int i = 0; i < 2; i++) {
+    const AxisSettings &s = settings.axis[i], &a = _active[i];
+    if (s.microsteps != a.microsteps || s.gearRatio != a.gearRatio || s.invert != a.invert) return true;
+  }
+  return false;
+}
+
+void Mount::applyCurrents() {
+  MountLock lock(*this);
+  _ra->setCurrent(settings.axis[0].currentMa);
+  _dec->setCurrent(settings.axis[1].currentMa);
+}
+
+// ---------------------------------------------------------------------------
 // Home and park
 // ---------------------------------------------------------------------------
 MountError Mount::findHome() {
@@ -419,6 +451,8 @@ MountError Mount::findHome() {
   _ra->stop();
   _dec->stop();
   for (int i = 0; i < 2; i++) {
+    _home[i].dir = settings.axis[i].homeDir;
+    _home[i].switchAngle = settings.axis[i].homeAngle;
     _home[i].phase = _home[i].sw ? HP_CLEAR : HP_SEEK;
     _home[i].startAngle = _home[i].axis->angle();
   }
