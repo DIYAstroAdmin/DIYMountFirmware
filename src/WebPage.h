@@ -12,8 +12,14 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   :root { --bg:#120808; --panel:#1e0f0f; --line:#4a1f1f; --text:#e8b0a8; --dim:#9a6860; --accent:#c0392b; --hot:#ff6b5a; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:baseline; }
-  h1 { margin:0; font-size:1.2rem; }
+  header { padding:10px 16px 0; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px 20px; align-items:flex-end; }
+  h1 { margin:0 0 10px; font-size:1.2rem; }
+  header .tag { margin:0 0 10px auto; align-self:center; }
+  nav { display:flex; gap:2px; }
+  nav button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:8px 14px; color:var(--dim); }
+  nav button:active { background:none; color:var(--text); }
+  nav button.on { background:none; color:var(--text); border-bottom-color:var(--accent); }
+  .tab[hidden] { display:none; }
   h2 { margin:0 0 10px; font-size:.85rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); }
   main { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; padding:12px; max-width:1100px; margin:auto; }
   section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
@@ -30,14 +36,14 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   .row > * { flex:1; }
   .pad { display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(3,56px); gap:6px; justify-content:center; }
   .pad button { font-size:1.1rem; }
-  #msg { min-height:1.3em; color:var(--hot); margin-top:10px; font-size:.9rem; }
+  .msg { min-height:1.3em; color:var(--hot); margin-top:10px; font-size:.9rem; }
   .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
   .tag { font-size:.8rem; padding:2px 8px; border:1px solid var(--line); border-radius:10px; }
   .bad { color:var(--hot); border-color:var(--hot); }
   .wide { grid-column:1 / -1; }
   .head { display:flex; justify-content:space-between; align-items:baseline; }
   .head button { padding:2px 10px; font-size:.8rem; }
-  #log { height:220px; overflow-y:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+  #log { height:calc(100vh - 150px); min-height:200px; overflow-y:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px;
          font-family:ui-monospace,Consolas,monospace; font-size:.8rem; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
   #log .debug { color:var(--dim); }
   #log .warn { color:var(--hot); }
@@ -53,8 +59,16 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 </style>
 </head>
 <body>
-<header><h1>MyMount</h1><span id="state" class="tag">connecting</span></header>
-<main>
+<header>
+  <h1>MyMount</h1>
+  <nav>
+    <button data-tab="main">Main</button>
+    <button data-tab="setup">Setup</button>
+    <button data-tab="log">Log</button>
+  </nav>
+  <span id="state" class="tag">connecting</span>
+</header>
+<main id="tab-main" class="tab">
   <section>
     <h2>Position</h2>
     <div class="grid">
@@ -69,7 +83,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <span>Drivers</span><span id="drv">--</span>
       <span>Home switches</span><span id="sw">--</span>
     </div>
-    <div id="msg"></div>
+    <div class="msg"></div>
   </section>
 
   <section>
@@ -116,7 +130,9 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <button id="settime">Set time from this device</button>
     </div>
   </section>
+</main>
 
+<main id="tab-setup" class="tab" hidden>
   <section>
     <h2>Configuration</h2>
     <div class="two">
@@ -135,6 +151,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <button id="save">Save</button>
       <button id="reboot">Restart</button>
     </div>
+    <div class="msg"></div>
   </section>
 
   <section>
@@ -160,8 +177,11 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <button id="saveaxes">Save</button>
       <button id="reboot2">Restart</button>
     </div>
+    <div class="msg"></div>
   </section>
+</main>
 
+<main id="tab-log" class="tab" hidden>
   <section class="wide">
     <div class="head"><h2>Log</h2><button id="clearlog">Clear</button></div>
     <div id="log"></div>
@@ -173,7 +193,9 @@ const $ = id => document.getElementById(id);
 const CONFIG_FIELDS = ['latitude','longitude','elevation','meridianLimit','guideRate','slewRate','ssid','hostname'];
 let status = null, note = '', noteUntil = 0, timeSent = false;
 
-function say(text) { note = text; noteUntil = Date.now() + 5000; $('msg').textContent = text; }
+// Messages show in every .msg box, so they are visible whichever tab is open.
+const showMsg = text => document.querySelectorAll('.msg').forEach(m => m.textContent = text);
+function say(text) { note = text; noteUntil = Date.now() + 5000; showMsg(text); }
 
 async function cmd(name, params = {}) {
   try {
@@ -220,7 +242,7 @@ async function refresh() {
     $('track').classList.toggle('on', s.tracking);
     $('park').textContent = s.atPark ? 'Unpark' : 'Park';
     if (document.activeElement !== $('trackrate')) $('trackrate').value = s.trackRate;
-    if (Date.now() > noteUntil) $('msg').textContent = s.message;
+    if (Date.now() > noteUntil) showMsg(s.message);
     if (!s.timeSet && !timeSent) { timeSent = true; cmd('time', { utc: Date.now() / 1000 }); }
   } catch (e) {
     $('state').textContent = 'offline';
@@ -339,6 +361,19 @@ $('saveaxes').onclick = () => {
 };
 
 $('clearlog').onclick = () => $('log').replaceChildren();
+
+// Tabs. The open tab is kept in the address (#main, #setup, #log) so a reload stays on it.
+const TABS = ['main', 'setup', 'log'];
+function showTab(name) {
+  if (!TABS.includes(name)) name = 'main';
+  TABS.forEach(t => $('tab-' + t).hidden = t !== name);
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  if (name === 'log') $('log').scrollTop = $('log').scrollHeight;   // lines may have arrived while hidden
+  if (name === 'setup') loadConfig();                                // pick up changes made elsewhere
+  history.replaceState(null, '', '#' + name);
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+showTab(location.hash.slice(1));
 
 loadConfig();
 refresh();
