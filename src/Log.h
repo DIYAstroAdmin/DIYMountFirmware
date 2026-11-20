@@ -5,6 +5,9 @@
 //
 // The newest CAPACITY lines are kept; older ones are overwritten. Safe to call from
 // any task, but not from an interrupt handler.
+//
+// Messages below the current level (setLevel) are not written at all. The LOGx macros
+// check the level first, so a suppressed message's arguments are not even evaluated.
 #pragma once
 #include <Arduino.h>
 
@@ -24,12 +27,21 @@ struct Entry {
 
 void write(Level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
+void setLevel(Level level);   // lowest level that is written; Info after boot
+Level level();
+inline bool enabled(Level l) { return l >= level(); }
+
 uint32_t newest();                      // seq of the latest line, 0 if nothing has been logged
 bool read(uint32_t seq, Entry &out);    // false if that line does not exist or has been overwritten
 
 }  // namespace Log
 
-#define LOGD(...) Log::write(Log::Level::Debug, __VA_ARGS__)
-#define LOGI(...) Log::write(Log::Level::Info, __VA_ARGS__)
-#define LOGW(...) Log::write(Log::Level::Warn, __VA_ARGS__)
-#define LOGE(...) Log::write(Log::Level::Error, __VA_ARGS__)
+#define LOG_AT(lvl, ...)                                \
+  do {                                                  \
+    if (Log::enabled(lvl)) Log::write(lvl, __VA_ARGS__); \
+  } while (0)
+
+#define LOGD(...) LOG_AT(Log::Level::Debug, __VA_ARGS__)
+#define LOGI(...) LOG_AT(Log::Level::Info, __VA_ARGS__)
+#define LOGW(...) LOG_AT(Log::Level::Warn, __VA_ARGS__)
+#define LOGE(...) LOG_AT(Log::Level::Error, __VA_ARGS__)

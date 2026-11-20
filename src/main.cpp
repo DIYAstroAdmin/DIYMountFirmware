@@ -60,6 +60,7 @@ void setup() {
   Serial.begin(LX200_BAUD);
   LOGI(FIRMWARE_NAME " " FIRMWARE_VERSION " starting");
   settings.load();
+  Log::setLevel((Log::Level)settings.logLevel);
   mount.begin();
   startWiFi();
   WebUI::begin();

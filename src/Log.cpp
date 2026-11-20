@@ -6,8 +6,14 @@ namespace Log {
 static Entry entries[CAPACITY];
 static uint32_t lastSeq = 0;   // line 'seq' lives in entries[(seq - 1) % CAPACITY]
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+static volatile Level minLevel = Level::Info;
+
+void setLevel(Level level) { minLevel = level > Level::Error ? Level::Error : level; }
+
+Level level() { return minLevel; }
 
 void write(Level level, const char *fmt, ...) {
+  if (level < minLevel) return;   // also covers direct calls that bypass the LOGx macros
   // Format outside the critical section; only the copy into the buffer is locked.
   char text[LINE_LENGTH];
   va_list args;

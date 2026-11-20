@@ -120,6 +120,21 @@ static void handleCommand() {
       Astro::setUtc(utc);
       sendResult(M_OK);
     }
+  } else if (cmd == "loglevel") {
+    int level = server.arg("level").toInt();
+    if (!server.hasArg("level") || level < (int)Log::Level::Debug || level > (int)Log::Level::Error) {
+      sendFail("Bad log level");
+    } else {
+      static const char *NAMES[] = {"debug", "info", "warning", "error"};
+      // Record the change under the more verbose of the old and new levels, so it shows either way.
+      Log::Level newLevel = (Log::Level)level;
+      if (newLevel < Log::level()) Log::setLevel(newLevel);
+      LOGI("Log level set to %s", NAMES[level]);
+      Log::setLevel(newLevel);
+      settings.logLevel = (uint8_t)level;
+      settings.save();
+      sendResult(M_OK);
+    }
   } else if (cmd == "reboot") {
     sendResult(M_OK);
     rebootRequested = true;
@@ -158,7 +173,7 @@ static void handleLog() {
     any = true;
     j += "{\"t\":" + String(e.ms) + ",\"l\":" + String((int)e.level) + ",\"m\":\"" + jsonEscape(e.text) + "\"}";
   }
-  j += "],\"next\":" + String(newest) + "}";
+  j += "],\"next\":" + String(newest) + ",\"level\":" + String((int)Log::level()) + "}";
   sendJson(j);
 }
 

@@ -1,6 +1,7 @@
 #include "Settings.h"
 #include <Preferences.h>
 #include "Config.h"
+#include "Log.h"
 
 Settings settings;
 
@@ -25,6 +26,7 @@ void Settings::sanitize() {
   guideRate = constrain(guideRate, 0.1, 1.0);
   slewRate = constrain(slewRate, 0.05, (double)MAX_SLEW_RATE);
   meridianLimit = constrain(meridianLimit, 0.0, 30.0);
+  if (logLevel > (uint8_t)Log::Level::Error) logLevel = (uint8_t)Log::Level::Info;
   if (hostname.length() == 0) hostname = DEFAULT_HOSTNAME;
   for (int i = 0; i < 2; i++) {
     AxisSettings &a = axis[i];
@@ -51,6 +53,7 @@ void Settings::load() {
   guideRate = p.getDouble("guide", DEFAULT_GUIDE_RATE);
   slewRate = p.getDouble("slew", DEFAULT_SLEW_RATE);
   meridianLimit = p.getDouble("merid", DEFAULT_MERIDIAN_LIMIT);
+  logLevel = p.getUChar("loglvl", (uint8_t)Log::Level::Info);
   for (int i = 0; i < 2; i++) {
     const AxisSettings &d = AXIS_DEFAULTS[i];
     AxisSettings &a = axis[i];
@@ -78,6 +81,7 @@ void Settings::save() {
   p.putDouble("guide", guideRate);
   p.putDouble("slew", slewRate);
   p.putDouble("merid", meridianLimit);
+  p.putUChar("loglvl", logLevel);
   for (int i = 0; i < 2; i++) {
     const AxisSettings &a = axis[i];
     p.putUShort(key(i, "ms").c_str(), a.microsteps);

@@ -2,10 +2,27 @@
 #include <stdarg.h>
 #include "Astro.h"
 #include "Config.h"
+#include "Log.h"
 #include "Mount.h"
 #include "Settings.h"
 
 static const double SIDEREAL_DEG_S = 360.0 / 86164.0905;
+
+// Writes to the serial port and keeps a copy of the reply for the log.
+void LX200::send(const char *text) {
+  _s.print(text);
+  size_t room = sizeof(_reply) - 1 - _replyLen;
+  size_t n = strlen(text);
+  if (n > room) n = room;
+  memcpy(_reply + _replyLen, text, n);
+  _replyLen += n;
+  _reply[_replyLen] = 0;
+}
+
+void LX200::send(char c) {
+  char text[2] = {c, 0};
+  send(text);
+}
 
 void LX200::sendf(const char *fmt, ...) {
   char out[80];
@@ -13,7 +30,7 @@ void LX200::sendf(const char *fmt, ...) {
   va_start(args, fmt);
   vsnprintf(out, sizeof(out), fmt, args);
   va_end(args);
-  _s.print(out);
+  send(out);
 }
 
 void LX200::poll() {
@@ -21,7 +38,9 @@ void LX200::poll() {
     char c = (char)_s.read();
     if (!_inCmd) {
       if (c == 0x06) {
-        _s.print('G');          // ACK: German equatorial
+        beginReply();
+        send('G');          // ACK: German equatorial
+        LOGD("<ACK> => %s", _reply);
       } else if (c == ':') {
         _inCmd = true;
         _len = 0;
@@ -63,7 +82,18 @@ static int dirFromChar(char c) {
   return -1;
 }
 
+void LX200::beginReply() {
+  _replyLen = 0;
+  _reply[0] = 0;
+}
+
 void LX200::execute(const char *cmd) {
+  beginReply();
+  dispatch(cmd);
+  LOGD(":%s# => %s", cmd, _reply);
+}
+
+void LX200::dispatch(const char *cmd) {
   switch (cmd[0]) {
     case 'G': cmdGet(cmd); break;
     case 'S': cmdSet(cmd); break;
@@ -86,7 +116,7 @@ void LX200::execute(const char *cmd) {
     case 'C':                                // :CM# sync to target, :CS# silent sync
       if (cmd[1] == 'M') {
         mount.syncTarget();
-        _s.print("Coordinates     matched.        #");
+        send("Coordinates     matched.        #");
       } else if (cmd[1] == 'S') {
         mount.syncTarget();
       }
@@ -95,14 +125,14 @@ void LX200::execute(const char *cmd) {
     case 'D': {                              // :D# slew progress bar
       MountStatus st;
       mount.getStatus(st);
-      _s.print(st.state != MountState::Idle ? "\x7f#" : "#");
+      send(st.state != MountState::Idle ? "\x7f#" : "#");
       break;
     }
 
     case 'T':                                // tracking control
       switch (cmd[1]) {
-        case 'e': _s.print(mount.setTracking(true) == M_OK ? '1' : '0'); break;
-        case 'd': mount.setTracking(false); _s.print('1'); break;
+        case 'e': send(mount.setTracking(true) == M_OK ? '1' : '0'); break;
+        case 'd': mount.setTracking(false); send('1'); break;
         case 'Q': mount.setTrackRate(TRACK_SIDEREAL); break;
         case 'L': mount.setTrackRate(TRACK_LUNAR); break;
         case 'S': mount.setTrackRate(TRACK_SOLAR); break;
@@ -114,7 +144,7 @@ void LX200::execute(const char *cmd) {
         case 'P': mount.park(); break;       // slew to the home position and stop
         case 'F': mount.findHome(); break;   // seek the home switches
         case 'W': mount.unpark(); break;
-        case 'R': mount.unpark(); _s.print('1'); break;
+        case 'R': mount.unpark(); send('1'); break;
       }
       break;
 
@@ -128,9 +158,9 @@ void LX200::cmdMove(const char *cmd) {
     case 'S': {                              // :MS# slew to target
       MountError e = mount.gotoTarget();
       if (e == M_OK) {
-        _s.print('0');
+        send('0');
       } else if (e == M_BELOW_HORIZON) {
-        _s.print("1Object below horizon.#");
+        send("1Object below horizon.#");
       } else {
         sendf("2%s.#", Mount::errorText(e));
       }
@@ -224,14 +254,14 @@ void LX200::cmdGet(const char *cmd) {
       break;
     case 'm':                                // pier side
       mount.getStatus(st);
-      _s.print(st.pierSide == PIER_EAST ? "E#" : "W#");
+      send(st.pierSide == PIER_EAST ? "E#" : "W#");
       break;
     case 'V':                                // firmware information
       switch (cmd[2]) {
-        case 'P': _s.print(FIRMWARE_NAME "#"); break;
-        case 'N': _s.print(FIRMWARE_VERSION "#"); break;
-        case 'D': _s.print(__DATE__ "#"); break;
-        case 'T': _s.print(__TIME__ "#"); break;
+        case 'P': send(FIRMWARE_NAME "#"); break;
+        case 'N': send(FIRMWARE_VERSION "#"); break;
+        case 'D': send(__DATE__ "#"); break;
+        case 'T': send(__TIME__ "#"); break;
       }
       break;
   }
@@ -242,27 +272,27 @@ void LX200::cmdSet(const char *cmd) {
   double v;
   switch (cmd[1]) {
     case 'r':                                // :SrHH:MM:SS# target RA
-      _s.print(Astro::parseSexagesimal(arg, v) && mount.setTargetRa(v) ? '1' : '0');
+      send(Astro::parseSexagesimal(arg, v) && mount.setTargetRa(v) ? '1' : '0');
       break;
     case 'd':                                // :SdsDD*MM:SS# target Dec
-      _s.print(Astro::parseSexagesimal(arg, v) && mount.setTargetDec(v) ? '1' : '0');
+      send(Astro::parseSexagesimal(arg, v) && mount.setTargetDec(v) ? '1' : '0');
       break;
     case 't':                                // :StsDD*MM# latitude
       if (Astro::parseSexagesimal(arg, v) && fabs(v) <= 90.0) {
         settings.latitude = v;
         settings.save();
-        _s.print('1');
+        send('1');
       } else {
-        _s.print('0');
+        send('0');
       }
       break;
     case 'g':                                // :SgDDD*MM# longitude, west positive (0..360)
       if (Astro::parseSexagesimal(arg, v) && fabs(v) <= 360.0) {
         settings.longitude = Astro::norm180(-v);
         settings.save();
-        _s.print('1');
+        send('1');
       } else {
-        _s.print('0');
+        send('0');
       }
       break;
     case 'G':                                // :SGsHH.H# UTC offset
@@ -270,18 +300,18 @@ void LX200::cmdSet(const char *cmd) {
         // Keep the local time unchanged; clients send the offset and local time in either order.
         Astro::setUtc(Astro::utcNow() + (v - _utcOffset) * 3600.0);
         _utcOffset = v;
-        _s.print('1');
+        send('1');
       } else {
-        _s.print('0');
+        send('0');
       }
       break;
     case 'L':                                // :SLHH:MM:SS# local time
       if (Astro::parseSexagesimal(arg, v) && v >= 0 && v < 24.0) {
         double day = floor(localNow() / 86400.0);
         Astro::setUtc(day * 86400.0 + v * 3600.0 + _utcOffset * 3600.0);
-        _s.print('1');
+        send('1');
       } else {
-        _s.print('0');
+        send('0');
       }
       break;
     case 'C': {                              // :SCMM/DD/YY# local date
@@ -291,9 +321,9 @@ void LX200::cmdSet(const char *cmd) {
         double tod = fmod(localNow(), 86400.0);
         if (tod < 0) tod += 86400.0;
         Astro::setUtc((double)Astro::daysFromCivil(yr, mo, da) * 86400.0 + tod + _utcOffset * 3600.0);
-        _s.print("1Updating Planetary Data#                              #");
+        send("1Updating Planetary Data#                              #");
       } else {
-        _s.print('0');
+        send('0');
       }
       break;
     }

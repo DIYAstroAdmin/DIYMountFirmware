@@ -42,7 +42,9 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   .bad { color:var(--hot); border-color:var(--hot); }
   .wide { grid-column:1 / -1; }
   .head { display:flex; justify-content:space-between; align-items:baseline; }
-  .head button { padding:2px 10px; font-size:.8rem; }
+  .head button, .head select { padding:2px 10px; font-size:.8rem; }
+  .head .tools { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .head .tools label { margin:0; }
   #log { height:calc(100vh - 150px); min-height:200px; overflow-y:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px;
          font-family:ui-monospace,Consolas,monospace; font-size:.8rem; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
   #log .debug { color:var(--dim); }
@@ -183,7 +185,16 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 
 <main id="tab-log" class="tab" hidden>
   <section class="wide">
-    <div class="head"><h2>Log</h2><button id="clearlog">Clear</button></div>
+    <div class="head"><h2>Log</h2>
+      <div class="tools">
+        <label for="loglevel">Level</label>
+        <select id="loglevel">
+          <option value="0">Debug</option><option value="1">Info</option>
+          <option value="2">Warning</option><option value="3">Error</option>
+        </select>
+        <button id="clearlog">Clear</button>
+      </div>
+    </div>
     <div id="log"></div>
   </section>
 </main>
@@ -262,6 +273,7 @@ async function refreshLog() {
     logNow = j.now;
     if (restarted) { logSeq = 0; return; }   // uptime went backwards: fetch everything next time
     logSeq = j.next;
+    if (document.activeElement !== $('loglevel')) $('loglevel').value = j.level;
     if (!j.lines.length) return;
     const box = $('log');
     const follow = box.scrollHeight - box.scrollTop - box.clientHeight < 8;
@@ -361,6 +373,8 @@ $('saveaxes').onclick = () => {
 };
 
 $('clearlog').onclick = () => $('log').replaceChildren();
+// The level is applied on the controller: messages below it are never written.
+$('loglevel').onchange = async () => { await cmd('loglevel', { level: $('loglevel').value }); $('loglevel').blur(); refreshLog(); };
 
 // Tabs. The open tab is kept in the address (#main, #setup, #log) so a reload stays on it.
 const TABS = ['main', 'setup', 'log'];
