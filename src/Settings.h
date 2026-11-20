@@ -23,6 +23,8 @@ struct Settings {
   double slewRate;        // deg/s
   double meridianLimit;   // deg past the meridian
   uint8_t logLevel;       // Log::Level: 0 debug, 1 info, 2 warning, 3 error
+  bool logLx200;          // log LX200 commands and replies
+  bool logAlpaca;         // log Alpaca requests and responses
   AxisSettings axis[2];
 
   void load();

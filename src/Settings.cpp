@@ -54,6 +54,8 @@ void Settings::load() {
   slewRate = p.getDouble("slew", DEFAULT_SLEW_RATE);
   meridianLimit = p.getDouble("merid", DEFAULT_MERIDIAN_LIMIT);
   logLevel = p.getUChar("loglvl", (uint8_t)Log::Level::Info);
+  logLx200 = p.getBool("loglx", false);
+  logAlpaca = p.getBool("logalp", false);
   for (int i = 0; i < 2; i++) {
     const AxisSettings &d = AXIS_DEFAULTS[i];
     AxisSettings &a = axis[i];
@@ -82,6 +84,8 @@ void Settings::save() {
   p.putDouble("slew", slewRate);
   p.putDouble("merid", meridianLimit);
   p.putUChar("loglvl", logLevel);
+  p.putBool("loglx", logLx200);
+  p.putBool("logalp", logAlpaca);
   for (int i = 0; i < 2; i++) {
     const AxisSettings &a = axis[i];
     p.putUShort(key(i, "ms").c_str(), a.microsteps);

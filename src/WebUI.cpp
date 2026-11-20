@@ -135,6 +135,20 @@ static void handleCommand() {
       settings.save();
       sendResult(M_OK);
     }
+  } else if (cmd == "logsource") {
+    // Switches the generation of protocol traffic messages, not just their display.
+    String src = server.arg("source");
+    bool on = server.arg("on") == "1";
+    if (!server.hasArg("on") || (src != "lx200" && src != "alpaca")) {
+      sendFail("Bad log source");
+    } else {
+      bool lx = src == "lx200";
+      Log::setSourceEnabled(lx ? Log::Source::Lx200 : Log::Source::Alpaca, on);
+      (lx ? settings.logLx200 : settings.logAlpaca) = on;
+      settings.save();
+      LOGI("%s logging %s", lx ? "LX200" : "Alpaca", on ? "on" : "off");
+      sendResult(M_OK);
+    }
   } else if (cmd == "reboot") {
     sendResult(M_OK);
     rebootRequested = true;
@@ -173,7 +187,9 @@ static void handleLog() {
     any = true;
     j += "{\"t\":" + String(e.ms) + ",\"l\":" + String((int)e.level) + ",\"m\":\"" + jsonEscape(e.text) + "\"}";
   }
-  j += "],\"next\":" + String(newest) + ",\"level\":" + String((int)Log::level()) + "}";
+  j += "],\"next\":" + String(newest) + ",\"level\":" + String((int)Log::level());
+  j += ",\"lx200\":" + String(Log::sourceEnabled(Log::Source::Lx200) ? "true" : "false");
+  j += ",\"alpaca\":" + String(Log::sourceEnabled(Log::Source::Alpaca) ? "true" : "false") + "}";
   sendJson(j);
 }
 

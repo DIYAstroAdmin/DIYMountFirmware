@@ -12,6 +12,14 @@ void setLevel(Level level) { minLevel = level > Level::Error ? Level::Error : le
 
 Level level() { return minLevel; }
 
+static volatile bool sourceOn[2] = {false, false};   // indexed by Source
+
+void setSourceEnabled(Source s, bool on) {
+  if ((size_t)s < 2) sourceOn[(size_t)s] = on;
+}
+
+bool sourceEnabled(Source s) { return (size_t)s < 2 && sourceOn[(size_t)s]; }
+
 void write(Level level, const char *fmt, ...) {
   if (level < minLevel) return;   // also covers direct calls that bypass the LOGx macros
   // Format outside the critical section; only the copy into the buffer is locked.

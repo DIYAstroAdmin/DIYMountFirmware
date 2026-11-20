@@ -45,6 +45,8 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   .head button, .head select { padding:2px 10px; font-size:.8rem; }
   .head .tools { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
   .head .tools label { margin:0; }
+  .head .tools label.check { display:flex; align-items:center; gap:4px; margin-right:6px; cursor:pointer; }
+  .head .tools input[type=checkbox] { width:auto; margin:0; }
   #log { height:calc(100vh - 150px); min-height:200px; overflow-y:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px;
          font-family:ui-monospace,Consolas,monospace; font-size:.8rem; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
   #log .debug { color:var(--dim); }
@@ -187,6 +189,8 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
   <section class="wide">
     <div class="head"><h2>Log</h2>
       <div class="tools">
+        <label class="check"><input id="log_lx200" type="checkbox"> LX200</label>
+        <label class="check"><input id="log_alpaca" type="checkbox"> Alpaca</label>
         <label for="loglevel">Level</label>
         <select id="loglevel">
           <option value="0">Debug</option><option value="1">Info</option>
@@ -274,6 +278,8 @@ async function refreshLog() {
     if (restarted) { logSeq = 0; return; }   // uptime went backwards: fetch everything next time
     logSeq = j.next;
     if (document.activeElement !== $('loglevel')) $('loglevel').value = j.level;
+    $('log_lx200').checked = j.lx200;
+    $('log_alpaca').checked = j.alpaca;
     if (!j.lines.length) return;
     const box = $('log');
     const follow = box.scrollHeight - box.scrollTop - box.clientHeight < 8;
@@ -375,6 +381,10 @@ $('saveaxes').onclick = () => {
 $('clearlog').onclick = () => $('log').replaceChildren();
 // The level is applied on the controller: messages below it are never written.
 $('loglevel').onchange = async () => { await cmd('loglevel', { level: $('loglevel').value }); $('loglevel').blur(); refreshLog(); };
+// LX200 and Alpaca traffic (Info level) is switched on the controller too, not just hidden.
+for (const src of ['lx200', 'alpaca']) {
+  $('log_' + src).onchange = async e => { await cmd('logsource', { source: src, on: e.target.checked ? 1 : 0 }); refreshLog(); };
+}
 
 // Tabs. The open tab is kept in the address (#main, #setup, #log) so a reload stays on it.
 const TABS = ['main', 'setup', 'log'];

@@ -61,6 +61,8 @@ void setup() {
   LOGI(FIRMWARE_NAME " " FIRMWARE_VERSION " starting");
   settings.load();
   Log::setLevel((Log::Level)settings.logLevel);
+  Log::setSourceEnabled(Log::Source::Lx200, settings.logLx200);
+  Log::setSourceEnabled(Log::Source::Alpaca, settings.logAlpaca);
   mount.begin();
   startWiFi();
   WebUI::begin();

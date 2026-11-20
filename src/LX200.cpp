@@ -40,7 +40,7 @@ void LX200::poll() {
       if (c == 0x06) {
         beginReply();
         send('G');          // ACK: German equatorial
-        LOGD("<ACK> => %s", _reply);
+        LOG_LX200("LX200 <ACK> => %s", _reply);
       } else if (c == ':') {
         _inCmd = true;
         _len = 0;
@@ -90,7 +90,7 @@ void LX200::beginReply() {
 void LX200::execute(const char *cmd) {
   beginReply();
   dispatch(cmd);
-  LOGD(":%s# => %s", cmd, _reply);
+  LOG_LX200("LX200 :%s# => %s", cmd, _reply);
 }
 
 void LX200::dispatch(const char *cmd) {

@@ -3,6 +3,7 @@
 #include <WiFiUdp.h>
 #include "Astro.h"
 #include "Config.h"
+#include "Log.h"
 #include "Mount.h"
 #include "Settings.h"
 #include "WebUI.h"
@@ -48,8 +49,33 @@ static String jsonString(const String &s) {
   return out;
 }
 
+// Logs the current request with the outcome, e.g.
+//   Alpaca PUT slewtocoordinatesasync RightAscension=5.5 Declination=20 => OK
+// The client bookkeeping parameters are left out to keep lines short.
+static void logExchange(const String &outcome) {
+  if (!LOG_SOURCE_ON(Log::Source::Alpaca)) return;
+  static const char *PREFIX = "/api/v1/telescope/0/";
+  String line = server.method() == HTTP_PUT ? "Alpaca PUT " : "Alpaca GET ";
+  String uri = server.uri();
+  if (uri.length() > strlen(PREFIX) && uri.substring(0, strlen(PREFIX)).equalsIgnoreCase(PREFIX))
+    uri = uri.substring(strlen(PREFIX));
+  line += uri;
+  for (int i = 0; i < server.args(); i++) {
+    const String name = server.argName(i);
+    if (name.equalsIgnoreCase("ClientID") || name.equalsIgnoreCase("ClientTransactionID") || name == "plain")
+      continue;
+    line += ' ';
+    line += name;
+    line += '=';
+    line += server.arg(i);
+  }
+  LOG_ALPACA("%s => %s", line.c_str(), outcome.c_str());
+}
+
 // value: JSON text for "Value", or empty for methods that return nothing.
 static void sendResponse(const String &value, int errNum = 0, const char *errMsg = "") {
+  if (errNum) logExchange("error 0x" + String(errNum, HEX) + " " + errMsg);
+  else logExchange(value.length() ? value : String("OK"));
   String id;
   uint32_t clientTransaction = 0;
   if (findArg("ClientTransactionID", id)) clientTransaction = strtoul(id.c_str(), nullptr, 10);
@@ -69,7 +95,10 @@ static void sendInt(long v) { sendResponse(String(v)); }
 static void sendDouble(double v) { sendResponse(String(v, 8)); }
 static void sendString(const String &v) { sendResponse(jsonString(v)); }
 static void notImplemented() { sendError(E_NOT_IMPLEMENTED, "Not implemented"); }
-static void badRequest(const String &msg) { server.send(400, "text/plain", msg); }
+static void badRequest(const String &msg) {
+  logExchange("HTTP 400 " + msg);
+  server.send(400, "text/plain", msg);
+}
 
 // Parameter readers. On failure they send HTTP 400 and return false.
 static bool numArg(const char *name, double &v) {
