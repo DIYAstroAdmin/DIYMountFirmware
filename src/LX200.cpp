@@ -248,7 +248,10 @@ void LX200::cmdGet(const char *cmd) {
       sendf("%c%03d*%02d#", neg ? '-' : '+', d, m);
       break;
     }
-    case 'W':                                // mount status
+    case 'v':                                // site elevation, metres (OnStep extension)
+      sendf("%+07.1f#", settings.elevation);
+      break;
+    case 'W':                               // mount status
       mount.getStatus(st);
       sendf("G%c%c#", st.tracking ? 'T' : 'N', st.atPark ? 'P' : '1');
       break;
@@ -295,6 +298,18 @@ void LX200::cmdSet(const char *cmd) {
         send('0');
       }
       break;
+    case 'v': {                              // :SvsDDDD.D# site elevation, metres (OnStep extension)
+      char *end;
+      v = strtod(arg, &end);
+      if (end != arg && v >= -300.0 && v <= 10000.0) {
+        settings.elevation = v;
+        settings.save();
+        send('1');
+      } else {
+        send('0');
+      }
+      break;
+    }
     case 'G':                                // :SGsHH.H# UTC offset
       if (Astro::parseSexagesimal(arg, v) && fabs(v) <= 14.0) {
         // Keep the local time unchanged; clients send the offset and local time in either order.

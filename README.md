@@ -91,7 +91,7 @@ Slews are asynchronous only (`SlewToCoordinatesAsync`, `SlewToTargetAsync`).
 | Guiding   | `:Mgn# :Mgs# :Mge# :Mgw#` (duration in ms) |
 | Tracking  | `:Te# :Td# :TQ# :TL# :TS#` |
 | Home/park | `:hF#` find home switches, `:hP#` park, `:hW#` unpark |
-| Site/time | `:St# :Gt# :Sg# :Gg# :SG# :GG# :SL# :GL# :SC# :GC#` |
+| Site/time | `:St# :Gt# :Sg# :Gg# :SG# :GG# :SL# :GL# :SC# :GC#`, elevation `:Sv±DDDD.D# :Gv#` (metres, OnStep extension) |
 | Info      | `:GVP# :GVN# :GVD# :GVT# :GW#`, ACK (0x06) |
 
 ## Behaviour to know about
