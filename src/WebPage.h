@@ -100,8 +100,8 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
     <div class="row">
       <select id="rate">
         <option value="g">Guide rate</option>
-        <option value="c">Centre rate</option>
-        <option value="m" selected>Find rate</option>
+        <option value="q" selected>1/4 slew rate</option>
+        <option value="h">1/2 slew rate</option>
         <option value="s">Slew rate</option>
       </select>
       <select id="trackrate">

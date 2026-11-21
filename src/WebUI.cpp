@@ -68,8 +68,8 @@ static void handleStatus() {
 
 static double rateFor(const String &name) {
   if (name == "g") return settings.guideRate * SIDEREAL_DEG_S;
-  if (name == "c") return CENTER_RATE_SIDEREAL * SIDEREAL_DEG_S;
-  if (name == "m") return settings.slewRate * 0.25;
+  if (name == "q") return settings.slewRate * 0.25;
+  if (name == "h") return settings.slewRate * 0.5;
   return settings.slewRate;
 }
 

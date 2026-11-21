@@ -36,7 +36,7 @@
 // ---------------------------------------------------------------------------
 // Motion
 // ---------------------------------------------------------------------------
-#define MAX_SLEW_RATE         3.0     // deg/s, hard upper limit for goto and manual moves
+#define MAX_SLEW_RATE         5.0     // deg/s, hard upper limit for goto and manual moves
 #define MAX_STEP_RATE         200000.0  // steps/s the step generator can produce; an axis whose
                                         // microsteps and gear ratio would need more is slowed down
 #define SLEW_ACCELERATION     2.0     // deg/s^2
