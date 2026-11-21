@@ -43,7 +43,7 @@ void Mount::begin() {
   pinMode(PIN_DEC_HOME, INPUT);
 
   Serial1.begin(TMC_BAUD, SERIAL_8N1, PIN_TMC_RX, PIN_TMC_TX);
-  _engine.init();
+  _engine.init(1);   // step generator task on core 1, away from WiFi
 
   // Microsteps, gear ratio and direction are fixed from here until the next restart.
   for (int i = 0; i < 2; i++) _active[i] = settings.axis[i];

@@ -1,4 +1,8 @@
 // Runtime settings stored in flash (NVS). Defaults come from Config.h.
+//
+// The settings are changed from more than one task (LX200 on core 1, web and Alpaca on
+// core 0). Hold a SettingsLock while changing the String fields or several fields that
+// belong together; save() takes the lock itself.
 #pragma once
 #include <Arduino.h>
 
@@ -36,3 +40,11 @@ struct Settings {
 };
 
 extern Settings settings;
+
+// Recursive, so code that holds it may call save().
+struct SettingsLock {
+  SettingsLock();
+  ~SettingsLock();
+  SettingsLock(const SettingsLock &) = delete;
+  SettingsLock &operator=(const SettingsLock &) = delete;
+};

@@ -194,6 +194,7 @@ static void handleLog() {
 }
 
 static void handleConfigGet() {
+  SettingsLock lock;
   String j = "{";
   j += "\"ssid\":\"" + jsonEscape(settings.ssid) + "\"";
   j += ",\"hostname\":\"" + jsonEscape(settings.hostname) + "\"";
@@ -228,6 +229,7 @@ static void handleConfigGet() {
 }
 
 static void handleConfigPost() {
+  SettingsLock lock;
   bool wifiChanged = false;
   if (server.hasArg("ssid") && server.arg("ssid") != settings.ssid) {
     settings.ssid = server.arg("ssid");

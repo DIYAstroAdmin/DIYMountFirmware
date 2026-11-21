@@ -7,6 +7,17 @@ Settings settings;
 
 static const char *NS = "mymount";
 
+// Created by load(), which runs in setup() before any other task is started.
+static SemaphoreHandle_t mutex = nullptr;
+
+SettingsLock::SettingsLock() {
+  if (mutex) xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+}
+
+SettingsLock::~SettingsLock() {
+  if (mutex) xSemaphoreGiveRecursive(mutex);
+}
+
 static const AxisSettings AXIS_DEFAULTS[2] = {
     {RA_MICROSTEPS, RA_GEAR_RATIO, RA_INVERT_DIR, RA_RUN_CURRENT_MA, RA_HOME_SEARCH_DIR, RA_HOME_SWITCH_ANGLE},
     {DEC_MICROSTEPS, DEC_GEAR_RATIO, DEC_INVERT_DIR, DEC_RUN_CURRENT_MA, DEC_HOME_SEARCH_DIR, DEC_HOME_SWITCH_ANGLE},
@@ -42,6 +53,8 @@ void Settings::sanitize() {
 static String key(int i, const char *name) { return String(AXIS_PREFIX[i]) + "." + name; }
 
 void Settings::load() {
+  if (!mutex) mutex = xSemaphoreCreateRecursiveMutex();
+  SettingsLock lock;
   Preferences p;
   p.begin(NS, true);
   ssid = p.getString("ssid", DEFAULT_WIFI_SSID);
@@ -71,6 +84,7 @@ void Settings::load() {
 }
 
 void Settings::save() {
+  SettingsLock lock;
   sanitize();
   Preferences p;
   p.begin(NS, false);

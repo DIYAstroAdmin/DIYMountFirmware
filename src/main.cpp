@@ -1,6 +1,10 @@
 // MyMount - equatorial mount controller for the FYSETC E4.
 //
 // The USB serial port speaks LX200 only, so nothing else may print to Serial.
+//
+// Core use: everything network related (WiFi, mDNS, web page, Alpaca, NTP) runs in the
+// "comms" task on core 0, next to the WiFi driver. Core 1 is left to mount control: the
+// mount task, the step generator, and LX200 on the USB serial port (loop()).
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
@@ -56,6 +60,17 @@ static void pollNtp() {
   }
 }
 
+// Network task, pinned to core 0.
+static void commsTask(void *) {
+  startWiFi();
+  WebUI::begin();
+  for (;;) {
+    WebUI::poll();
+    pollNtp();
+    vTaskDelay(1);   // also lets the core 0 idle task run, which the task watchdog checks
+  }
+}
+
 void setup() {
   Serial.begin(LX200_BAUD);
   LOGI(FIRMWARE_NAME " " FIRMWARE_VERSION " starting");
@@ -64,13 +79,12 @@ void setup() {
   Log::setSourceEnabled(Log::Source::Lx200, settings.logLx200);
   Log::setSourceEnabled(Log::Source::Alpaca, settings.logAlpaca);
   mount.begin();
-  startWiFi();
-  WebUI::begin();
+  // Same stack as the Arduino loop task: the web handlers build JSON responses in Strings.
+  xTaskCreatePinnedToCore(commsTask, "comms", 8192, nullptr, 1, nullptr, 0);
 }
 
+// Runs on core 1 (the Arduino default), below the mount task's priority.
 void loop() {
   lx200.poll();
-  WebUI::poll();
-  pollNtp();
   delay(1);
 }
