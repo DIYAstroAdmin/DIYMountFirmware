@@ -100,9 +100,9 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
     <div class="row">
       <select id="rate">
         <option value="g">Guide rate</option>
-        <option value="q" selected>1/4 slew rate</option>
+        <option value="q">1/4 slew rate</option>
         <option value="h">1/2 slew rate</option>
-        <option value="s">Slew rate</option>
+        <option value="s" selected>Slew rate</option>
       </select>
       <select id="trackrate">
         <option value="0">Sidereal</option>
@@ -116,7 +116,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
     </div>
     <div class="row">
       <button id="home">Find home</button>
-      <button id="sethome">Set home here</button>
+      <button id="setpark">Set park</button>
     </div>
   </section>
 
@@ -382,8 +382,8 @@ $('stop').onclick = () => cmd('stop');
 $('track').onclick = () => status && cmd('track', { on: status.tracking ? 0 : 1 }).then(refresh);
 $('trackrate').onchange = () => cmd('trackrate', { rate:$('trackrate').value });
 $('park').onclick = () => status && cmd(status.atPark ? 'unpark' : 'park').then(refresh);
-$('home').onclick = () => confirm('Search for the home switches now?') && cmd('home');
-$('sethome').onclick = () => confirm('Declare the current position to be home (counterweight down, pointing at the pole)?') && cmd('sethome');
+$('home').onclick = () => cmd('home');
+$('setpark').onclick = () => cmd('setpark').then(ok => ok && say('Park position set'));
 $('goto').onclick = () => { const t = target(); if (t) cmd('goto' + t.suffix, t.params); };
 $('sync').onclick = () => { const t = target(); if (t) cmd('sync' + t.suffix, t.params).then(ok => ok && say('Synced')); };
 $('settime').onclick = () => cmd('time', { utc: Date.now() / 1000 }).then(ok => ok && say('Time set'));

@@ -7,7 +7,7 @@
 //                               axis2 >= 0 -> HA = axis1 + 90  (scope east of pier, looking west)
 //                               axis2 <  0 -> HA = axis1 - 90  (scope west of pier, looking east)
 //                               |Dec| = 90 - |axis2|
-// Home/park position is axis1 = 0, axis2 = 0.
+// Home position is axis1 = 0, axis2 = 0. The park position is saved in settings (home by default).
 //
 // All public methods are thread safe; motion is serviced by an internal task.
 #pragma once
@@ -90,9 +90,9 @@ class Mount {
   void abort();                 // stop everything except tracking
 
   MountError findHome();        // seek the home switches, then go to the home position
-  MountError park();            // slew to the home position and stop tracking
+  MountError park();            // slew to the park position and stop tracking
   void unpark();
-  MountError setHomeHere();     // declare the current position to be the home position
+  MountError setParkHere();     // save the current position as the park position
 
   // Axis configuration. Microsteps, gear ratio and direction in 'settings' take effect at
   // the next restart; restartNeeded() says whether the saved values differ from the running ones.
@@ -124,6 +124,7 @@ class Mount {
   void tickSlew();
   void tickHoming();
   void readSwitches();
+  void updateLed();
 
   void axesToHaDec(double a1, double a2, double &ha, double &dec, int &side);
   void axesForSide(double ha, double dec, int side, double &a1, double &a2);
@@ -148,8 +149,10 @@ class Mount {
   bool _tracking = false;
   int _trackRate = TRACK_SIDEREAL;
   bool _atPark = false;
+  bool _saveParked = false;          // park finished: record it in settings outside the lock
   bool _homed = false;
   const char *_message = "";
+  bool _fatal = false;               // motor start-up failed; the status LED stays off
 
   double _manual[2] = {0, 0};        // mechanical deg/s
   int64_t _manualEnd[2] = {0, 0};    // 0 = no timeout

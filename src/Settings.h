@@ -26,6 +26,9 @@ struct Settings {
   double guideRate;       // multiples of sidereal
   double slewRate;        // deg/s
   double meridianLimit;   // deg past the meridian
+  double parkAxis1;       // park position, mechanical axis angles in deg (0, 0 = home)
+  double parkAxis2;
+  bool parked;            // mount was parked: it starts at the park position after a restart
   uint8_t logLevel;       // Log::Level: 0 debug, 1 info, 2 warning, 3 error
   bool logLx200;          // log LX200 commands and replies
   bool logAlpaca;         // log Alpaca requests and responses

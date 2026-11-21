@@ -114,8 +114,8 @@ static void handleCommand() {
   } else if (cmd == "unpark") {
     mount.unpark();
     sendResult(M_OK);
-  } else if (cmd == "sethome") {
-    sendResult(mount.setHomeHere());
+  } else if (cmd == "setpark") {
+    sendResult(mount.setParkHere());
   } else if (cmd == "time") {
     double utc = server.arg("utc").toDouble();
     if (utc < 1.5e9) {

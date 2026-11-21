@@ -37,6 +37,8 @@ void Settings::sanitize() {
   guideRate = constrain(guideRate, 0.1, 1.0);
   slewRate = constrain(slewRate, 0.05, (double)MAX_SLEW_RATE);
   meridianLimit = constrain(meridianLimit, 0.0, 30.0);
+  if (!(parkAxis1 >= -180.0 && parkAxis1 <= 180.0)) parkAxis1 = 0;
+  if (!(parkAxis2 >= -180.0 && parkAxis2 <= 180.0)) parkAxis2 = 0;
   if (logLevel > (uint8_t)Log::Level::Error) logLevel = (uint8_t)Log::Level::Info;
   if (hostname.length() == 0) hostname = DEFAULT_HOSTNAME;
   for (int i = 0; i < 2; i++) {
@@ -66,6 +68,9 @@ void Settings::load() {
   guideRate = p.getDouble("guide", DEFAULT_GUIDE_RATE);
   slewRate = p.getDouble("slew", DEFAULT_SLEW_RATE);
   meridianLimit = p.getDouble("merid", DEFAULT_MERIDIAN_LIMIT);
+  parkAxis1 = p.getDouble("park1", 0.0);
+  parkAxis2 = p.getDouble("park2", 0.0);
+  parked = p.getBool("parked", false);
   logLevel = p.getUChar("loglvl", (uint8_t)Log::Level::Info);
   logLx200 = p.getBool("loglx", false);
   logAlpaca = p.getBool("logalp", false);
@@ -97,6 +102,9 @@ void Settings::save() {
   p.putDouble("guide", guideRate);
   p.putDouble("slew", slewRate);
   p.putDouble("merid", meridianLimit);
+  p.putDouble("park1", parkAxis1);
+  p.putDouble("park2", parkAxis2);
+  p.putBool("parked", parked);
   p.putUChar("loglvl", logLevel);
   p.putBool("loglx", logLx200);
   p.putBool("logalp", logAlpaca);

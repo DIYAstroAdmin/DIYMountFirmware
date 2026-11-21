@@ -72,6 +72,10 @@ static void commsTask(void *) {
 }
 
 void setup() {
+#if PIN_STATUS_LED >= 0
+  pinMode(PIN_STATUS_LED, OUTPUT);
+  digitalWrite(PIN_STATUS_LED, !STATUS_LED_ON);   // off until the mount is running (see Mount::updateLed)
+#endif
   Serial.begin(LX200_BAUD);
   LOGI(FIRMWARE_NAME " " FIRMWARE_VERSION " starting");
   settings.load();

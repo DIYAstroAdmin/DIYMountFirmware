@@ -52,12 +52,24 @@ void Mount::begin() {
                   ra.currentMa, ra.microsteps});
   _dec = new Axis({PIN_DEC_STEP, PIN_DEC_DIR, dec.invert, Settings::stepsPerDeg(1, dec), DEC_TMC_ADDRESS,
                    dec.currentMa, dec.microsteps});
-  if (!_ra->begin(_engine, Serial1)) LOGE("RA axis: step generator could not be started");
-  if (!_dec->begin(_engine, Serial1)) LOGE("Dec axis: step generator could not be started");
+  if (!_ra->begin(_engine, Serial1)) {
+    LOGE("RA axis: step generator could not be started");
+    _fatal = true;
+  }
+  if (!_dec->begin(_engine, Serial1)) {
+    LOGE("Dec axis: step generator could not be started");
+    _fatal = true;
+  }
   if (_ra->driverOk()) LOGI("RA driver ok");
-  else LOGE("RA driver not responding");
+  else {
+    LOGE("RA driver not responding");
+    _fatal = true;
+  }
   if (_dec->driverOk()) LOGI("Dec driver ok");
-  else LOGE("Dec driver not responding");
+  else {
+    LOGE("Dec driver not responding");
+    _fatal = true;
+  }
 
   Axis *axes[2] = {_ra, _dec};
   const char *names[2] = {"RA", "Dec"};
@@ -67,6 +79,14 @@ void Mount::begin() {
     if (axes[i]->maxRate() < MAX_SLEW_RATE)
       LOGW("%s axis: speed limited to %.2f deg/s by the step rate (fewer microsteps would allow more)",
            names[i], axes[i]->maxRate());
+  }
+
+  // A mount that was parked when it was switched off is still at the park position.
+  if (settings.parked) {
+    _ra->setAngle(settings.parkAxis1);
+    _dec->setAngle(settings.parkAxis2);
+    _atPark = true;
+    LOGI("Starting parked");
   }
 
   _home[0] = {_ra, PIN_RA_HOME, 1, 0, RA_HOME_MAX_TRAVEL, HP_DONE, 0, false, 0};
@@ -81,12 +101,40 @@ void Mount::begin() {
 void Mount::taskEntry(void *arg) {
   Mount *m = static_cast<Mount *>(arg);
   for (;;) {
+    bool saveParked;
     {
       MountLock lock(*m);
       m->tick();
+      m->updateLed();
+      saveParked = m->_saveParked;
+      m->_saveParked = false;
+    }
+    if (saveParked) {               // written outside the mount lock: writing flash is slow
+      SettingsLock slock;
+      bool parked;
+      {
+        MountLock lock(*m);
+        parked = m->_atPark;          // an unpark may have arrived meanwhile
+      }
+      settings.parked = parked;
+      settings.save();
     }
     vTaskDelay(pdMS_TO_TICKS(2));
   }
+}
+
+// Status LED: off after a start-up failure, 2 flashes/s while slewing, homing or moving
+// manually, 1 flash/s while tracking, steady when idle. (Off before the mount task starts.)
+void Mount::updateLed() {
+#if PIN_STATUS_LED >= 0
+  bool on;
+  uint32_t t = millis();
+  if (_fatal) on = false;
+  else if (_state != MountState::Idle || _manual[0] != 0 || _manual[1] != 0) on = (t % 500) < 250;
+  else if (_tracking) on = (t % 1000) < 500;
+  else on = true;
+  digitalWrite(PIN_STATUS_LED, on ? STATUS_LED_ON : !STATUS_LED_ON);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -509,25 +557,41 @@ MountError Mount::park() {
   if (_state == MountState::Homing) return M_BUSY;
   _tracking = false;
   LOGI("Parking");
-  startSlew(0, 0, SLEW_PARK);
+  startSlew(settings.parkAxis1, settings.parkAxis2, SLEW_PARK);
   return M_OK;
 }
 
 void Mount::unpark() {
-  MountLock lock(*this);
-  if (_atPark) LOGI("Unparked");
-  _atPark = false;
+  bool wasParked;
+  {
+    MountLock lock(*this);
+    wasParked = _atPark;
+    _atPark = false;
+    _saveParked = false;
+  }
+  if (!wasParked) return;
+  LOGI("Unparked");
+  SettingsLock lock;
+  settings.parked = false;
+  settings.save();
 }
 
-MountError Mount::setHomeHere() {
-  MountLock lock(*this);
-  if (_state != MountState::Idle) return M_BUSY;
-  clearManual();
-  _tracking = false;
-  _ra->setAngle(0);
-  _dec->setAngle(0);
-  _message = "";
-  LOGI("Current position set as home");
+MountError Mount::setParkHere() {
+  double a1, a2;
+  {
+    MountLock lock(*this);
+    if (_state != MountState::Idle || _manual[0] != 0 || _manual[1] != 0) return M_BUSY;
+    a1 = _ra->angle();
+    a2 = _dec->angle();
+  }
+  {
+    // Saved outside the mount lock: writing flash is slow.
+    SettingsLock lock;
+    settings.parkAxis1 = a1;
+    settings.parkAxis2 = a2;
+    settings.save();
+  }
+  LOGI("Park position set to axis1 %.2f, axis2 %.2f deg", a1, a2);
   return M_OK;
 }
 
@@ -628,6 +692,7 @@ void Mount::tickSlew() {
     case SLEW_PARK:
       _tracking = false;
       _atPark = true;
+      _saveParked = true;
       LOGI("Parked");
       break;
     case SLEW_HOME:

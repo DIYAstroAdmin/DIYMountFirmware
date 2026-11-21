@@ -36,7 +36,8 @@ Set on the web page (**Axes** panel), per axis:
 | Home search direction, home switch angle | At the next *Find home* |
 
 The gear ratio is the total reduction: motor revolutions per revolution of the axis.
-Restarting resets the mount position to home, so park the mount before restarting.
+Restarting resets the mount position to home unless the mount is parked, in which case it
+starts at the park position, still parked. Park the mount before restarting.
 If the microsteps and gear ratio would need more than 200,000 steps/s at the slew rate,
 that axis is slowed down; the panel shows each axis' maximum speed.
 
@@ -55,8 +56,12 @@ pio run -t upload
 ## Start-up position
 
 The controller has no encoders. At power-up it assumes the mount is in its **home position:
-counterweight down, telescope pointing at the celestial pole**. Either put the mount there
-before switching on, use *Find home* (switches), or move it there and press *Set home here*.
+counterweight down, telescope pointing at the celestial pole**, unless it was switched off
+parked, when it assumes the park position. Either put the mount there before switching on,
+or use *Find home* (switches).
+
+*Set park* saves the current position as the park position; *Park* slews there. Until it is
+set, the park position is home.
 
 ## Checking motor directions
 
@@ -64,7 +69,7 @@ Do this once, from the web page, with the mount at home:
 
 1. Turn tracking on. The RA axis must turn the way the sky moves (towards the west).
    If it turns the other way, tick *Reverse direction* for RA on the Axes panel, save and restart.
-2. Go back to home and *Set home here*. Hold **S** at the find rate. The telescope must tip
+2. Go back to home (*Find home*, or restart with the mount at home). Hold **S** at 1/4 slew rate. The telescope must tip
    over towards the **western** horizon. If it tips east, reverse Dec the same way.
 
 ## Connecting
@@ -101,7 +106,7 @@ that point in the sky without switching tracking on.
 - **Meridian.** A goto picks the pier side that keeps the counterweight down. Tracking carries
   on past the meridian by the configured limit (default 5 degrees) and then stops. To continue,
   issue the goto again and the mount will swap sides.
-- **Park** slews to the home position and stops tracking. Manual moves and gotos are refused
+- **Park** slews to the park position (home unless changed with *Set park*) and stops tracking. Manual moves and gotos are refused
   until the mount is unparked.
 - **Homing** runs past each switch at the fast rate before backing off and approaching slowly,
   so use switches that the axis can travel over (optical or hall sensors, or a cam).

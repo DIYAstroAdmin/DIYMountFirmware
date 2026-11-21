@@ -141,7 +141,7 @@ void LX200::dispatch(const char *cmd) {
 
     case 'h':                                // home / park
       switch (cmd[1]) {
-        case 'P': mount.park(); break;       // slew to the home position and stop
+        case 'P': mount.park(); break;       // slew to the park position and stop
         case 'F': mount.findHome(); break;   // seek the home switches
         case 'W': mount.unpark(); break;
         case 'R': mount.unpark(); send('1'); break;

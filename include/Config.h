@@ -95,6 +95,8 @@
 #define TMC_BAUD           115200
 #define RA_TMC_ADDRESS     1     // X driver UART address on the E4
 #define DEC_TMC_ADDRESS    3     // Y driver UART address on the E4
+#define PIN_STATUS_LED     13    // status LED; -1 = none. Set to the LED's GPIO.
+#define STATUS_LED_ON      HIGH  // level that lights the LED
 
 #define FIRMWARE_NAME      "DIYMount"
 #define FIRMWARE_VERSION   "1.0"
