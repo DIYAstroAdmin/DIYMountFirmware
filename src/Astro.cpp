@@ -65,6 +65,12 @@ void haDecToAltAz(double haDeg, double decDeg, double latDeg, double &altDeg, do
   azDeg = norm360(atan2(y, x) / r);
 }
 
+// The transform is its own inverse with hour angle <-> azimuth and declination <-> altitude.
+void altAzToHaDec(double altDeg, double azDeg, double latDeg, double &haDeg, double &decDeg) {
+  haDecToAltAz(azDeg, altDeg, latDeg, decDeg, haDeg);
+  haDeg = norm180(haDeg);
+}
+
 // Howard Hinnant's civil calendar algorithms.
 int64_t daysFromCivil(int y, int m, int d) {
   y -= m <= 2;

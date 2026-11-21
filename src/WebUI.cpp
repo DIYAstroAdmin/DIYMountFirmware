@@ -87,6 +87,10 @@ static void handleCommand() {
     sendResult(mount.gotoEqu(server.arg("ra").toDouble(), server.arg("dec").toDouble()));
   } else if (cmd == "sync") {
     sendResult(mount.syncEqu(server.arg("ra").toDouble(), server.arg("dec").toDouble()));
+  } else if (cmd == "gotoaltaz") {
+    sendResult(mount.gotoAltAz(server.arg("alt").toDouble(), server.arg("az").toDouble()));
+  } else if (cmd == "syncaltaz") {
+    sendResult(mount.syncAltAz(server.arg("alt").toDouble(), server.arg("az").toDouble()));
   } else if (cmd == "track") {
     sendResult(mount.setTracking(server.arg("on") == "1"));
   } else if (cmd == "trackrate") {

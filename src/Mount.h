@@ -74,6 +74,10 @@ class Mount {
   MountError syncTarget();
   MountError gotoEqu(double raHours, double decDeg);
   MountError syncEqu(double raHours, double decDeg);
+  // Alt/az (deg, azimuth from north through east). The target is fixed relative to the
+  // ground: the slew ends there without changing the tracking state.
+  MountError gotoAltAz(double altDeg, double azDeg);
+  MountError syncAltAz(double altDeg, double azDeg);
   int destinationSideOfPier(double raHours, double decDeg);   // -1 if unreachable
 
   // Manual motion. axis 0: positive = RA increasing (east); axis 1: positive = north.
@@ -99,7 +103,7 @@ class Mount {
   static const char *errorText(MountError e);
 
  private:
-  enum SlewKind { SLEW_GOTO, SLEW_PARK, SLEW_HOME };
+  enum SlewKind { SLEW_GOTO, SLEW_ALTAZ, SLEW_PARK, SLEW_HOME };
   enum HomePhase { HP_CLEAR, HP_SEEK, HP_BACKOFF, HP_APPROACH, HP_DONE };
 
   struct HomeAxis {
@@ -128,6 +132,8 @@ class Mount {
   double trackDegPerSec();
   double decDirection();        // sign of d(axis2)/d(dec) at the current position
   void startSlew(double a1, double a2, SlewKind kind);
+  MountError gotoAllowed();     // M_OK if a new goto may start now
+  MountError syncHaDec(double ha, double dec, double &a1, double &a2);
   void clearManual();
 
   SemaphoreHandle_t _mutex = nullptr;

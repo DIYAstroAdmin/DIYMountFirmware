@@ -20,6 +20,8 @@ double normHours(double h);          // 0..24
 
 // hour angle/declination -> altitude/azimuth (all degrees, azimuth from north through east)
 void haDecToAltAz(double haDeg, double decDeg, double latDeg, double &altDeg, double &azDeg);
+// and back; hour angle -180..180
+void altAzToHaDec(double altDeg, double azDeg, double latDeg, double &haDeg, double &decDeg);
 
 // --- calendar ---
 int64_t daysFromCivil(int y, int m, int d);                 // days since 1970-01-01

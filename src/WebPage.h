@@ -122,10 +122,23 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 
   <section>
     <h2>Goto / Sync</h2>
-    <label for="tra">Right ascension (h m s)</label>
-    <input id="tra" placeholder="05 34 32" autocomplete="off">
-    <label for="tdec">Declination (d m s)</label>
-    <input id="tdec" placeholder="+22 00 52" autocomplete="off">
+    <label for="tmode">Coordinates</label>
+    <select id="tmode" style="width:100%">
+      <option value="eq">RA / Dec</option>
+      <option value="altaz">Alt / Az (tracking unchanged)</option>
+    </select>
+    <div id="t-eq">
+      <label for="tra">Right ascension (h m s)</label>
+      <input id="tra" placeholder="05 34 32" autocomplete="off">
+      <label for="tdec">Declination (d m s)</label>
+      <input id="tdec" placeholder="+22 00 52" autocomplete="off">
+    </div>
+    <div id="t-altaz" hidden>
+      <label for="talt">Altitude (d m s)</label>
+      <input id="talt" placeholder="+45 00 00" autocomplete="off">
+      <label for="taz">Azimuth (d m s, from north through east)</label>
+      <input id="taz" placeholder="180 00 00" autocomplete="off">
+    </div>
     <div class="row">
       <button id="goto">Goto</button>
       <button id="sync">Sync</button>
@@ -345,11 +358,25 @@ document.querySelectorAll('[data-dir]').forEach(b => {
   ['pointerup','pointercancel','pointerleave'].forEach(ev => b.addEventListener(ev, end));
 });
 
+// Goto/sync target from whichever coordinate set is shown: { cmd suffix, params } or null.
 function target() {
+  if ($('tmode').value === 'altaz') {
+    const alt = parseSexa($('talt').value);
+    let az = parseSexa($('taz').value);
+    if (az === 360) az = 0;
+    if (isNaN(alt) || isNaN(az) || alt < -90 || alt > 90 || az < 0 || az >= 360) { say('Enter a valid altitude and azimuth'); return null; }
+    return { suffix: 'altaz', params: { alt, az } };
+  }
   const ra = parseSexa($('tra').value), dec = parseSexa($('tdec').value);
   if (isNaN(ra) || isNaN(dec) || ra < 0 || ra >= 24 || dec < -90 || dec > 90) { say('Enter a valid RA and Dec'); return null; }
-  return { ra, dec };
+  return { suffix: '', params: { ra, dec } };
 }
+
+$('tmode').onchange = () => {
+  const altaz = $('tmode').value === 'altaz';
+  $('t-eq').hidden = altaz;
+  $('t-altaz').hidden = !altaz;
+};
 
 $('stop').onclick = () => cmd('stop');
 $('track').onclick = () => status && cmd('track', { on: status.tracking ? 0 : 1 }).then(refresh);
@@ -357,8 +384,8 @@ $('trackrate').onchange = () => cmd('trackrate', { rate:$('trackrate').value });
 $('park').onclick = () => status && cmd(status.atPark ? 'unpark' : 'park').then(refresh);
 $('home').onclick = () => confirm('Search for the home switches now?') && cmd('home');
 $('sethome').onclick = () => confirm('Declare the current position to be home (counterweight down, pointing at the pole)?') && cmd('sethome');
-$('goto').onclick = () => { const t = target(); if (t) cmd('goto', t); };
-$('sync').onclick = () => { const t = target(); if (t) cmd('sync', t).then(ok => ok && say('Synced')); };
+$('goto').onclick = () => { const t = target(); if (t) cmd('goto' + t.suffix, t.params); };
+$('sync').onclick = () => { const t = target(); if (t) cmd('sync' + t.suffix, t.params).then(ok => ok && say('Synced')); };
 $('settime').onclick = () => cmd('time', { utc: Date.now() / 1000 }).then(ok => ok && say('Time set'));
 const restart = () => confirm('Restart the controller? The mount position will be reset to home.') && cmd('reboot');
 $('reboot').onclick = restart;

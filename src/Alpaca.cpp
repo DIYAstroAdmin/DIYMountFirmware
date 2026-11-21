@@ -193,8 +193,9 @@ static bool handleGet(const String &m) {
   else if (m == "cansettracking") sendBool(true);
   else if (m == "canslewasync") sendBool(true);
   else if (m == "cansync") sendBool(true);
-  else if (m == "canslew" || m == "canslewaltaz" || m == "canslewaltazasync" || m == "cansyncaltaz" ||
-           m == "cansetpark" || m == "cansetpierside" || m == "cansetdeclinationrate" ||
+  else if (m == "canslewaltazasync") sendBool(true);
+  else if (m == "cansyncaltaz") sendBool(true);
+  else if (m == "canslew" || m == "canslewaltaz" || m == "cansetpark" || m == "cansetpierside" || m == "cansetdeclinationrate" ||
            m == "cansetrightascensionrate" || m == "doesrefraction")
     sendBool(false);
   else if (m == "canmoveaxis") {
@@ -275,6 +276,30 @@ static bool requireTracking() {
   }
   if (!st.tracking) {
     sendError(E_INVALID_OPERATION, "Tracking is off");
+    return false;
+  }
+  return true;
+}
+
+static bool altAzArgs(double &alt, double &az) {
+  if (!numArg("Azimuth", az) || !numArg("Altitude", alt)) return false;
+  if (alt < -90 || alt > 90 || az < 0 || az >= 360) {
+    sendError(E_INVALID_VALUE, "Coordinates out of range");
+    return false;
+  }
+  return true;
+}
+
+// Alt/az slews and syncs are only allowed with tracking off.
+static bool requireNotTracking() {
+  MountStatus st;
+  mount.getStatus(st);
+  if (st.atPark) {
+    sendError(E_PARKED, "Mount is parked");
+    return false;
+  }
+  if (st.tracking) {
+    sendError(E_INVALID_OPERATION, "Tracking is on");
     return false;
   }
   return true;
@@ -373,11 +398,18 @@ static bool handlePut(const String &m) {
   } else if (m == "synctotarget") {
     if (!requireTracking()) return true;
     sendMountResult(mount.syncTarget());
+  } else if (m == "slewtoaltazasync") {
+    double alt, az;
+    if (!altAzArgs(alt, az) || !requireNotTracking()) return true;
+    sendMountResult(mount.gotoAltAz(alt, az));
+  } else if (m == "synctoaltaz") {
+    double alt, az;
+    if (!altAzArgs(alt, az) || !requireNotTracking()) return true;
+    sendMountResult(mount.syncAltAz(alt, az));
   }
 
   // Not supported
-  else if (m == "slewtocoordinates" || m == "slewtotarget" || m == "slewtoaltaz" || m == "slewtoaltazasync" ||
-           m == "synctoaltaz" || m == "setpark" || m == "declinationrate" || m == "rightascensionrate" ||
+  else if (m == "slewtocoordinates" || m == "slewtotarget" || m == "slewtoaltaz" || m == "setpark" || m == "declinationrate" || m == "rightascensionrate" ||
            m == "doesrefraction" || m == "sideofpier" || m == "action" || m == "commandblind" ||
            m == "commandbool" || m == "commandstring")
     notImplemented();

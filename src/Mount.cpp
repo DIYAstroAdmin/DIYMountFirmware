@@ -198,7 +198,7 @@ MountError Mount::setTracking(bool on) {
   if (on) {
     if (_atPark) return M_PARKED;
     if (_state == MountState::Homing) return M_BUSY;
-    if (_state == MountState::Slewing && _slewKind != SLEW_GOTO) return M_BUSY;
+    if (_state == MountState::Slewing && _slewKind != SLEW_GOTO && _slewKind != SLEW_ALTAZ) return M_BUSY;
     _message = "";
   }
   _tracking = on;
@@ -277,12 +277,19 @@ void Mount::startSlew(double a1, double a2, SlewKind kind) {
   _dec->moveTo(a2, settings.slewRate);
 }
 
+// A goto may replace a goto in progress, but not a park or home.
+MountError Mount::gotoAllowed() {
+  if (_atPark) return M_PARKED;
+  if (_state == MountState::Homing) return M_BUSY;
+  if (_state == MountState::Slewing && _slewKind != SLEW_GOTO && _slewKind != SLEW_ALTAZ) return M_BUSY;
+  return M_OK;
+}
+
 MountError Mount::gotoEqu(double raHours, double decDeg) {
   if (!(raHours >= 0.0 && raHours < 24.0) || !(decDeg >= -90.0 && decDeg <= 90.0)) return M_RANGE;
   MountLock lock(*this);
-  if (_atPark) return M_PARKED;
-  if (_state == MountState::Homing) return M_BUSY;
-  if (_state == MountState::Slewing && _slewKind != SLEW_GOTO) return M_BUSY;
+  MountError e = gotoAllowed();
+  if (e != M_OK) return e;
 
   double ha = currentHa(raHours);
   double alt, az;
@@ -302,15 +309,50 @@ MountError Mount::gotoEqu(double raHours, double decDeg) {
   return M_OK;
 }
 
+MountError Mount::gotoAltAz(double altDeg, double azDeg) {
+  if (!(altDeg >= -90.0 && altDeg <= 90.0) || !(azDeg >= 0.0 && azDeg < 360.0)) return M_RANGE;
+  MountLock lock(*this);
+  MountError e = gotoAllowed();
+  if (e != M_OK) return e;
+  if (altDeg < MIN_GOTO_ALTITUDE) return M_BELOW_HORIZON;
+
+  double ha, dec;
+  Astro::altAzToHaDec(altDeg, azDeg, settings.latitude, ha, dec);
+  double a1, a2;
+  int side;
+  if (!solve(ha, dec, a1, a2, side)) return M_LIMITS;
+
+  LOGI("Goto Alt %.3f, Az %.3f deg (HA %.4f h, Dec %.3f deg, pier %s, axes %.2f, %.2f)", altDeg, azDeg,
+       ha / 15.0, dec, side == PIER_EAST ? "East" : "West", a1, a2);
+  startSlew(a1, a2, SLEW_ALTAZ);
+  return M_OK;
+}
+
 MountError Mount::syncEqu(double raHours, double decDeg) {
   if (!(raHours >= 0.0 && raHours < 24.0) || !(decDeg >= -90.0 && decDeg <= 90.0)) return M_RANGE;
   MountLock lock(*this);
+  double a1, a2;
+  MountError e = syncHaDec(currentHa(raHours), decDeg, a1, a2);
+  if (e == M_OK) LOGI("Sync to RA %.4f h, Dec %.3f deg (axes %.2f, %.2f)", raHours, decDeg, a1, a2);
+  return e;
+}
+
+MountError Mount::syncAltAz(double altDeg, double azDeg) {
+  if (!(altDeg >= -90.0 && altDeg <= 90.0) || !(azDeg >= 0.0 && azDeg < 360.0)) return M_RANGE;
+  MountLock lock(*this);
+  double ha, dec, a1, a2;
+  Astro::altAzToHaDec(altDeg, azDeg, settings.latitude, ha, dec);
+  MountError e = syncHaDec(ha, dec, a1, a2);
+  if (e == M_OK) LOGI("Sync to Alt %.3f, Az %.3f deg (axes %.2f, %.2f)", altDeg, azDeg, a1, a2);
+  return e;
+}
+
+// Declares the mount to be pointing at ha/dec; a1, a2 receive the new axis angles.
+MountError Mount::syncHaDec(double ha, double decDeg, double &a1, double &a2) {
   if (_atPark) return M_PARKED;
   if (_state != MountState::Idle) return M_BUSY;
 
-  double ha = currentHa(raHours);
   double limit = 90.0 + settings.meridianLimit;
-  double a1, a2;
   int side;
   double cur2 = _dec->angle();
   bool done = false;
@@ -323,7 +365,6 @@ MountError Mount::syncEqu(double raHours, double decDeg) {
   if (!done && !solve(ha, decDeg, a1, a2, side)) return M_LIMITS;
   _ra->setAngle(a1);
   _dec->setAngle(a2);
-  LOGI("Sync to RA %.4f h, Dec %.3f deg (axes %.2f, %.2f)", raHours, decDeg, a1, a2);
   return M_OK;
 }
 
@@ -580,6 +621,9 @@ void Mount::tickSlew() {
     case SLEW_GOTO:
       _tracking = true;
       LOGI("Goto complete, tracking");
+      break;
+    case SLEW_ALTAZ:                      // tracking left as it is (off, unless switched on meanwhile)
+      LOGI("Alt/az goto complete");
       break;
     case SLEW_PARK:
       _tracking = false;

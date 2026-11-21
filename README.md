@@ -79,7 +79,9 @@ the web page is opened, or from the LX200/Alpaca client. Set latitude and longit
 web page.
 
 **Alpaca.** Port 80, device `telescope/0`. Clients find it through Alpaca discovery.
-Slews are asynchronous only (`SlewToCoordinatesAsync`, `SlewToTargetAsync`).
+Slews are asynchronous only (`SlewToCoordinatesAsync`, `SlewToTargetAsync`, `SlewToAltAzAsync`).
+Alt/az slews and `SyncToAltAz` need tracking off, as ASCOM requires; an alt/az slew stops at
+that point in the sky without switching tracking on.
 
 **LX200.** USB serial, 9600 baud, 8N1. Supported commands:
 
