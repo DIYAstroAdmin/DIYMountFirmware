@@ -64,10 +64,10 @@
 // ---------------------------------------------------------------------------
 #define DEFAULT_WIFI_SSID        ""  // empty = start own access point
 #define DEFAULT_WIFI_PASSWORD    ""
-#define DEFAULT_HOSTNAME         "mymount"   // also the access point name
-#define AP_PASSWORD              "mymount123"   // min 8 characters
-#define DEFAULT_LATITUDE         51.5        // deg, north positive
-#define DEFAULT_LONGITUDE        0.0         // deg, east positive
+#define DEFAULT_HOSTNAME         "diymount"   // also the access point name
+#define AP_PASSWORD              "password123" // min 8 characters
+#define DEFAULT_LATITUDE         52          // deg, north positive
+#define DEFAULT_LONGITUDE        -1.6        // deg, east positive
 #define DEFAULT_ELEVATION        0.0         // m
 #define DEFAULT_GUIDE_RATE       0.5         // multiples of sidereal
 #define DEFAULT_SLEW_RATE        2.0         // deg/s
@@ -96,5 +96,5 @@
 #define RA_TMC_ADDRESS     1     // X driver UART address on the E4
 #define DEC_TMC_ADDRESS    3     // Y driver UART address on the E4
 
-#define FIRMWARE_NAME      "MyMount"
+#define FIRMWARE_NAME      "DIYMount"
 #define FIRMWARE_VERSION   "1.0"
