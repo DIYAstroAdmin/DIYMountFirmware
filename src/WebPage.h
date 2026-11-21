@@ -64,7 +64,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>MyMount</h1>
+  <h1>DIYMount</h1>
   <nav>
     <button data-tab="main">Main</button>
     <button data-tab="setup">Setup</button>
