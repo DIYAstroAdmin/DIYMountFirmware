@@ -123,13 +123,13 @@ void Mount::taskEntry(void *arg) {
   }
 }
 
-// Status LED: off after a start-up failure, 2 flashes/s while slewing, homing or moving
-// manually, 1 flash/s while tracking, steady when idle. (Off before the mount task starts.)
+// Status LED: off after a start-up failure or when parked, 2 flashes/s while slewing, homing
+// or moving manually, 1 flash/s while tracking, steady when idle. (Off before the mount task starts.)
 void Mount::updateLed() {
 #if PIN_STATUS_LED >= 0
   bool on;
   uint32_t t = millis();
-  if (_fatal) on = false;
+  if (_fatal || _atPark) on = false;
   else if (_state != MountState::Idle || _manual[0] != 0 || _manual[1] != 0) on = (t % 500) < 250;
   else if (_tracking) on = (t % 1000) < 500;
   else on = true;
