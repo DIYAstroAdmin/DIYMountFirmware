@@ -99,13 +99,16 @@ that point in the sky without switching tracking on.
 | Tracking  | `:Te# :Td# :TQ# :TL# :TS#` |
 | Home/park | `:hF#` find home switches, `:hP#` park, `:hW#` unpark |
 | Site/time | `:St# :Gt# :Sg# :Gg# :SG# :GG# :SL# :GL# :SC# :GC#`, elevation `:Sv±DDDD.D# :Gv#` (metres, OnStep extension) |
+| Limits    | goto altitude `:ShsDD# :Gh#` (lowest) `:SoDD# :Go#` (highest), minutes past meridian `:SXE9,n# :GXE9#` (OnStep; `E9`/`EA` both set the one limit) |
 | Info      | `:GVP# :GVN# :GVD# :GVT# :GW#`, ACK (0x06) |
 
 ## Behaviour to know about
 
 - **Meridian.** A goto picks the pier side that keeps the counterweight down. Tracking carries
-  on past the meridian by the configured limit (default 5 degrees) and then stops. To continue,
+  on past the meridian by the configured limit (default 20 minutes, i.e. 5 degrees) and then stops. To continue,
   issue the goto again and the mount will swap sides.
+- **Goto altitude limits.** Gotos to targets below the minimum or above the maximum altitude
+  (default 0 and 90 degrees, set on the Setup tab or over LX200) are refused.
 - **Park** slews to the park position (home unless changed with *Set park*) and stops tracking. Manual moves and gotos are refused
   until the mount is unparked.
 - **Homing** runs past each switch at the fast rate before backing off and approaching slowly,

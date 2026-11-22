@@ -21,6 +21,7 @@ enum MountError {
   M_OK = 0,
   M_PARKED,
   M_BELOW_HORIZON,
+  M_ABOVE_LIMIT,
   M_LIMITS,
   M_BUSY,
   M_NO_TARGET,

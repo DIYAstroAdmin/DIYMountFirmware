@@ -7,7 +7,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MyMount</title>
+<title>DIYMount</title>
 <style>
   :root { --bg:#120808; --panel:#1e0f0f; --line:#4a1f1f; --text:#e8b0a8; --dim:#9a6860; --accent:#c0392b; --hot:#ff6b5a; }
   * { box-sizing:border-box; }
@@ -156,7 +156,9 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
       <div><label for="latitude">Latitude (deg, N+)</label><input id="latitude" type="number" step="any"></div>
       <div><label for="longitude">Longitude (deg, E+)</label><input id="longitude" type="number" step="any"></div>
       <div><label for="elevation">Elevation (m)</label><input id="elevation" type="number" step="any"></div>
-      <div><label for="meridianLimit">Past-meridian limit (deg)</label><input id="meridianLimit" type="number" step="any"></div>
+      <div><label for="meridianLimit">Past-meridian limit (min)</label><input id="meridianLimit" type="number" step="any"></div>
+      <div><label for="minGotoAlt">Min goto altitude (deg)</label><input id="minGotoAlt" type="number" step="any"></div>
+      <div><label for="maxGotoAlt">Max goto altitude (deg)</label><input id="maxGotoAlt" type="number" step="any"></div>
       <div><label for="guideRate">Guide rate (x sidereal)</label><input id="guideRate" type="number" step="any"></div>
       <div><label for="slewRate">Slew rate (deg/s)</label><input id="slewRate" type="number" step="any"></div>
       <div><label for="ssid">WiFi network</label><input id="ssid" autocomplete="off"></div>
@@ -218,7 +220,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!DOCTYPE html>
 
 <script>
 const $ = id => document.getElementById(id);
-const CONFIG_FIELDS = ['latitude','longitude','elevation','meridianLimit','guideRate','slewRate','ssid','hostname'];
+const CONFIG_FIELDS = ['latitude','longitude','elevation','meridianLimit','minGotoAlt','maxGotoAlt','guideRate','slewRate','ssid','hostname'];
 let status = null, note = '', noteUntil = 0, timeSent = false;
 
 // Messages show in every .msg box, so they are visible whichever tab is open.

@@ -36,7 +36,9 @@ void Settings::sanitize() {
   longitude = constrain(longitude, -180.0, 180.0);
   guideRate = constrain(guideRate, 0.1, 1.0);
   slewRate = constrain(slewRate, 0.05, (double)MAX_SLEW_RATE);
-  meridianLimit = constrain(meridianLimit, 0.0, 30.0);
+  meridianLimit = constrain(meridianLimit, 0.0, 120.0);
+  minGotoAlt = constrain(minGotoAlt, -30.0, 90.0);
+  maxGotoAlt = constrain(maxGotoAlt, minGotoAlt, 90.0);
   if (!(parkAxis1 >= -180.0 && parkAxis1 <= 180.0)) parkAxis1 = 0;
   if (!(parkAxis2 >= -180.0 && parkAxis2 <= 180.0)) parkAxis2 = 0;
   if (logLevel > (uint8_t)Log::Level::Error) logLevel = (uint8_t)Log::Level::Info;
@@ -67,7 +69,10 @@ void Settings::load() {
   elevation = p.getDouble("elev", DEFAULT_ELEVATION);
   guideRate = p.getDouble("guide", DEFAULT_GUIDE_RATE);
   slewRate = p.getDouble("slew", DEFAULT_SLEW_RATE);
-  meridianLimit = p.getDouble("merid", DEFAULT_MERIDIAN_LIMIT);
+  // Older firmware stored the limit in degrees under "merid".
+  meridianLimit = p.getDouble("meridm", p.getDouble("merid", DEFAULT_MERIDIAN_LIMIT * 0.25) * 4.0);
+  minGotoAlt = p.getDouble("minalt", DEFAULT_MIN_GOTO_ALT);
+  maxGotoAlt = p.getDouble("maxalt", DEFAULT_MAX_GOTO_ALT);
   parkAxis1 = p.getDouble("park1", 0.0);
   parkAxis2 = p.getDouble("park2", 0.0);
   parked = p.getBool("parked", false);
@@ -101,7 +106,10 @@ void Settings::save() {
   p.putDouble("elev", elevation);
   p.putDouble("guide", guideRate);
   p.putDouble("slew", slewRate);
-  p.putDouble("merid", meridianLimit);
+  p.putDouble("meridm", meridianLimit);
+  if (p.isKey("merid")) p.remove("merid");
+  p.putDouble("minalt", minGotoAlt);
+  p.putDouble("maxalt", maxGotoAlt);
   p.putDouble("park1", parkAxis1);
   p.putDouble("park2", parkAxis2);
   p.putBool("parked", parked);

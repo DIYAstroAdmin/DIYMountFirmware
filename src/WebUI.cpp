@@ -209,6 +209,8 @@ static void handleConfigGet() {
   j += ",\"slewRate\":" + String(settings.slewRate, 2);
   j += ",\"maxSlewRate\":" + String(min(mount.maxRate(0), mount.maxRate(1)), 2);
   j += ",\"meridianLimit\":" + String(settings.meridianLimit, 1);
+  j += ",\"minGotoAlt\":" + String(settings.minGotoAlt, 1);
+  j += ",\"maxGotoAlt\":" + String(settings.maxGotoAlt, 1);
   j += ",\"axes\":[";
   for (int i = 0; i < 2; i++) {
     const AxisSettings &a = settings.axis[i];
@@ -253,6 +255,8 @@ static void handleConfigPost() {
   if (server.hasArg("guideRate")) settings.guideRate = server.arg("guideRate").toDouble();
   if (server.hasArg("slewRate")) settings.slewRate = server.arg("slewRate").toDouble();
   if (server.hasArg("meridianLimit")) settings.meridianLimit = server.arg("meridianLimit").toDouble();
+  if (server.hasArg("minGotoAlt")) settings.minGotoAlt = server.arg("minGotoAlt").toDouble();
+  if (server.hasArg("maxGotoAlt")) settings.maxGotoAlt = server.arg("maxGotoAlt").toDouble();
 
   // Axis fields are named ra_<field> and dec_<field>.
   static const char *prefix[2] = {"ra_", "dec_"};

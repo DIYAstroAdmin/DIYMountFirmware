@@ -25,7 +25,9 @@ struct Settings {
   double elevation;       // m
   double guideRate;       // multiples of sidereal
   double slewRate;        // deg/s
-  double meridianLimit;   // deg past the meridian
+  double meridianLimit;   // minutes of time past the meridian, 0..120
+  double minGotoAlt;      // deg, -30..90: gotos below this are refused
+  double maxGotoAlt;      // deg, minGotoAlt..90: gotos above this are refused
   double parkAxis1;       // park position, mechanical axis angles in deg (0, 0 = home)
   double parkAxis2;
   bool parked;            // mount was parked: it starts at the park position after a restart
@@ -37,6 +39,8 @@ struct Settings {
   void load();
   void save();
   void sanitize();
+
+  double meridianLimitDeg() const { return meridianLimit * 0.25; }
 
   // Microsteps per degree of axis rotation for the given axis settings.
   static double stepsPerDeg(int axisIndex, const AxisSettings &a);

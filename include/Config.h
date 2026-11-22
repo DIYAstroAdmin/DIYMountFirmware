@@ -41,7 +41,6 @@
                                         // microsteps and gear ratio would need more is slowed down
 #define SLEW_ACCELERATION     2.0     // deg/s^2
 #define CENTER_RATE_SIDEREAL  16.0    // LX200 "centre" rate, multiples of sidereal
-#define MIN_GOTO_ALTITUDE     0.0     // deg, gotos below this altitude are refused
 
 // ---------------------------------------------------------------------------
 // Homing (switches on the E4 X-MIN and Y-MIN connectors)
@@ -71,7 +70,9 @@
 #define DEFAULT_ELEVATION        0.0         // m
 #define DEFAULT_GUIDE_RATE       0.5         // multiples of sidereal
 #define DEFAULT_SLEW_RATE        2.0         // deg/s
-#define DEFAULT_MERIDIAN_LIMIT   5.0         // deg the mount may track/slew past the meridian
+#define DEFAULT_MERIDIAN_LIMIT   20.0        // minutes of time the mount may track/slew past the meridian (4 min = 1 deg)
+#define DEFAULT_MIN_GOTO_ALT     0.0         // deg, gotos below this altitude are refused
+#define DEFAULT_MAX_GOTO_ALT     90.0        // deg, gotos above this altitude are refused
 
 #define NTP_SERVER               "pool.ntp.org"   // used when connected to a WiFi network
 

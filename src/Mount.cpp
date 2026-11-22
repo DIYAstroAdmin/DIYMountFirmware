@@ -23,6 +23,7 @@ const char *Mount::errorText(MountError e) {
     case M_OK: return "";
     case M_PARKED: return "Mount is parked";
     case M_BELOW_HORIZON: return "Target is below the horizon limit";
+    case M_ABOVE_LIMIT: return "Target is above the overhead limit";
     case M_LIMITS: return "Target is outside the mount limits";
     case M_BUSY: return "Mount is busy";
     case M_NO_TARGET: return "Target not set";
@@ -167,7 +168,7 @@ void Mount::axesForSide(double ha, double dec, int side, double &a1, double &a2)
 // Picks the pier side for a target. Prefers the counterweight-down solution;
 // returns false if neither side is within the axis1 limits.
 bool Mount::solve(double ha, double dec, double &a1, double &a2, int &side) {
-  double limit = 90.0 + settings.meridianLimit;
+  double limit = 90.0 + settings.meridianLimitDeg();
   double e1, e2, w1, w2;
   axesForSide(ha, dec, PIER_EAST, e1, e2);
   axesForSide(ha, dec, PIER_WEST, w1, w2);
@@ -342,7 +343,8 @@ MountError Mount::gotoEqu(double raHours, double decDeg) {
   double ha = currentHa(raHours);
   double alt, az;
   Astro::haDecToAltAz(ha, decDeg, settings.latitude, alt, az);
-  if (alt < MIN_GOTO_ALTITUDE) return M_BELOW_HORIZON;
+  if (alt < settings.minGotoAlt) return M_BELOW_HORIZON;
+  if (alt > settings.maxGotoAlt) return M_ABOVE_LIMIT;
 
   double a1, a2;
   int side;
@@ -362,7 +364,8 @@ MountError Mount::gotoAltAz(double altDeg, double azDeg) {
   MountLock lock(*this);
   MountError e = gotoAllowed();
   if (e != M_OK) return e;
-  if (altDeg < MIN_GOTO_ALTITUDE) return M_BELOW_HORIZON;
+  if (altDeg < settings.minGotoAlt) return M_BELOW_HORIZON;
+  if (altDeg > settings.maxGotoAlt) return M_ABOVE_LIMIT;
 
   double ha, dec;
   Astro::altAzToHaDec(altDeg, azDeg, settings.latitude, ha, dec);
@@ -400,7 +403,7 @@ MountError Mount::syncHaDec(double ha, double decDeg, double &a1, double &a2) {
   if (_atPark) return M_PARKED;
   if (_state != MountState::Idle) return M_BUSY;
 
-  double limit = 90.0 + settings.meridianLimit;
+  double limit = 90.0 + settings.meridianLimitDeg();
   int side;
   double cur2 = _dec->angle();
   bool done = false;
@@ -636,7 +639,7 @@ void Mount::tickIdle() {
   double v2 = _manual[1] + _guide[1];
 
   // Axis limits: never drive further out once a limit is reached.
-  double limit1 = 90.0 + settings.meridianLimit;
+  double limit1 = 90.0 + settings.meridianLimitDeg();
   double a1 = _ra->angle();
   if ((a1 >= limit1 && v1 > 0) || (a1 <= -limit1 && v1 < 0)) {
     if (_tracking) {

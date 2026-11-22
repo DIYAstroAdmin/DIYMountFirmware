@@ -251,6 +251,15 @@ void LX200::cmdGet(const char *cmd) {
     case 'v':                                // site elevation, metres (OnStep extension)
       sendf("%+07.1f#", settings.elevation);
       break;
+    case 'h':                                // lowest goto altitude
+      sendf("%+03d*#", (int)lround(settings.minGotoAlt));
+      break;
+    case 'o':                                // highest goto altitude
+      sendf("%02d*#", (int)lround(settings.maxGotoAlt));
+      break;
+    case 'X':                                // :GXE9# :GXEA# minutes past meridian east/west (OnStep)
+      if (cmd[2] == 'E' && (cmd[3] == '9' || cmd[3] == 'A')) sendf("%d#", (int)lround(settings.meridianLimit));
+      break;
     case 'W':                               // mount status
       mount.getStatus(st);
       sendf("G%c%c#", st.tracking ? 'T' : 'N', st.atPark ? 'P' : '1');
@@ -308,6 +317,35 @@ void LX200::cmdSet(const char *cmd) {
       } else {
         send('0');
       }
+      break;
+    }
+    case 'h':                                // :ShsDD# lowest goto altitude
+    case 'o': {                              // :SoDD# highest goto altitude
+      char *end;
+      v = strtod(arg, &end);
+      SettingsLock lock;
+      bool low = cmd[1] == 'h';
+      if (end != arg && v >= -30.0 && v <= 90.0 && (low ? v < settings.maxGotoAlt : v > settings.minGotoAlt)) {
+        (low ? settings.minGotoAlt : settings.maxGotoAlt) = v;
+        settings.save();
+        send('1');
+      } else {
+        send('0');
+      }
+      break;
+    }
+    case 'X': {                              // :SXE9,n# :SXEA,n# minutes past meridian east/west (OnStep);
+      char *end;                             // one limit serves both sides
+      if (cmd[2] == 'E' && (cmd[3] == '9' || cmd[3] == 'A') && cmd[4] == ',') {
+        v = strtod(cmd + 5, &end);
+        if (end != cmd + 5 && v >= 0.0 && v <= 120.0) {
+          settings.meridianLimit = v;
+          settings.save();
+          send('1');
+          break;
+        }
+      }
+      send('0');
       break;
     }
     case 'G':                                // :SGsHH.H# UTC offset
